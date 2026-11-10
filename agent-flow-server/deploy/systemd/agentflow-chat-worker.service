@@ -1,0 +1,21 @@
+[Unit]
+Description=AgentFlow chat worker (ARQ queue: agent-flow)
+After=network-online.target redis-server.service postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agentflow
+Group=agentflow
+WorkingDirectory=/opt/agentflow/agent-flow-server
+EnvironmentFile=/opt/agentflow/agent-flow-server/.env
+ExecStart=/opt/agentflow/agent-flow-server/.venv/bin/arq app.worker.chat_task.WorkerSettings
+Restart=always
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=30
+StandardOutput=append:/var/log/agentflow/chat-worker.log
+StandardError=append:/var/log/agentflow/chat-worker.err.log
+
+[Install]
+WantedBy=multi-user.target

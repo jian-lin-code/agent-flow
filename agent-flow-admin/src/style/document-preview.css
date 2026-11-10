@@ -1,0 +1,196 @@
+/* ==========================================================================
+   文档预览主题（Markdown / Word 共用）
+   预览正文区呈现一张居中"纸张卡片"：限宽、留白、柔和阴影，长文阅读舒适。
+   仅作用于 .doc-markdown 前缀，避免污染聊天页 .md-content。
+   PDF 预览不走本主题（保持浏览器原生 iframe 渲染）。
+   ========================================================================== */
+
+:root {
+  /* 默认深色纸张：与应用暗色界面一致 */
+  --doc-paper-bg: #161616;
+  --doc-text: #f2f2f2;
+  --doc-text-2: #a8a8a8;
+  --doc-border: #2b2b2b;
+  --doc-code-bg: #1e1e1e;
+}
+
+/* 浅色纸张变体：根节点加 data-doc-theme="light" 即可切换 */
+[data-doc-theme='light'] {
+  --doc-paper-bg: #ffffff;
+  --doc-text: #24292f;
+  --doc-text-2: #57606a;
+  --doc-border: #eaecef;
+  --doc-code-bg: #f6f8fa;
+}
+
+/* 滚动容器：深色应用背景上承载纸张卡片 */
+.doc-paper-scroll {
+  height: 100%;
+  width: 100%;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px 16px 40px;
+}
+
+/* ===== 标题导航（TOC）：吸顶在滚动容器左侧，右侧同宽占位保持纸张居中 ===== */
+.doc-toc {
+  flex: 0 0 200px;
+  width: 200px;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+  padding: 6px 14px 6px 0;
+  scrollbar-width: thin;
+}
+.doc-toc-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--af-text-2);
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+  padding-left: 10px;
+}
+.doc-toc-item {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--af-text-2);
+  padding: 5px 0 5px 10px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.doc-toc-item:hover { color: var(--af-text); }
+.doc-toc-item.active {
+  color: var(--af-primary);
+  border-left-color: var(--af-primary);
+  background: var(--af-primary-soft);
+  font-weight: 600;
+}
+.doc-toc-item.lv1 { font-weight: 600; color: var(--af-text); padding-left: 6px; }
+.doc-toc-item.lv1.active { color: var(--af-primary); }
+.doc-toc-item.lv2 { padding-left: 14px; }
+.doc-toc-item.lv3 { padding-left: 26px; font-size: 12px; }
+.doc-toc-balance { flex: 0 0 200px; width: 200px; }
+@media (max-width: 1360px) {
+  .doc-toc, .doc-toc-balance { display: none; }
+}
+
+
+/* 纸张卡片：flex-basis 0 + grow 占满目录与右侧占位之间的剩余空间，上限 820px */
+.doc-markdown {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 820px;
+  min-height: 560px;
+  margin: 0 auto;
+  background: var(--doc-paper-bg);
+  color: var(--doc-text);
+  border-radius: 12px;
+  border: 1px solid var(--doc-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.20), 0 8px 24px rgba(0, 0, 0, 0.35);
+  padding: 56px 64px 48px;
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', 'Songti SC', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.9;
+  letter-spacing: 0.01em;
+  word-break: break-word;
+}
+
+/* ===== 标题层级 ===== */
+.doc-markdown h1 { font-size: 28px; font-weight: 700; line-height: 1.35; margin: 0 0 20px; }
+.doc-markdown h2 {
+  font-size: 22px; font-weight: 650; line-height: 1.4; margin: 36px 0 16px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--doc-border);
+}
+.doc-markdown h3 {
+  font-size: 18px; font-weight: 650; line-height: 1.45; margin: 30px 0 12px;
+  padding-left: 12px; border-left: 3px solid var(--af-primary);
+}
+.doc-markdown h4 { font-size: 16px; font-weight: 600; line-height: 1.5; margin: 22px 0 10px; }
+.doc-markdown h5,
+.doc-markdown h6 { font-size: 15px; font-weight: 600; margin: 18px 0 8px; }
+
+/* ===== 正文与列表 ===== */
+.doc-markdown p { margin: 0 0 14px; }
+.doc-markdown ul,
+.doc-markdown ol { margin: 0 0 14px; padding-left: 26px; }
+.doc-markdown li { margin: 2px 0; }
+.doc-markdown li > p { margin: 0 0 6px; }
+.doc-markdown li::marker { color: var(--doc-text-2); }
+
+/* 公文版式：正文段落首行缩进两字（列表 / 引用 / 表格内不缩进） */
+.doc-markdown.is-doc-gongwen > p { text-indent: 2em; }
+
+/* ===== 强调 / 链接 / 分隔 ===== */
+.doc-markdown strong { font-weight: 650; color: var(--doc-text); }
+.doc-markdown em { font-style: italic; }
+.doc-markdown a { color: var(--af-primary); text-decoration: none; }
+.doc-markdown a:hover { text-decoration: underline; }
+.doc-markdown hr { border: none; border-top: 1px solid var(--doc-border); margin: 28px 0; }
+
+/* ===== 引用 ===== */
+.doc-markdown blockquote {
+  margin: 16px 0;
+  padding: 10px 16px;
+  border-left: 3px solid var(--af-primary);
+  background: rgba(255, 92, 51, 0.06);
+  color: var(--doc-text-2);
+  border-radius: 0 8px 8px 0;
+}
+.doc-markdown blockquote p:last-child { margin-bottom: 0; }
+
+/* ===== 行内代码与代码块 ===== */
+.doc-markdown code {
+  background: var(--doc-code-bg);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+}
+.doc-markdown pre {
+  background: var(--doc-code-bg);
+  border: 1px solid var(--doc-border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  overflow: auto;
+  margin: 16px 0;
+}
+.doc-markdown pre code { background: transparent; padding: 0; font-size: 13px; line-height: 1.6; }
+
+/* ===== 表格 ===== */
+.doc-markdown table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 16px 0; }
+.doc-markdown th,
+.doc-markdown td { border: 1px solid var(--doc-border); padding: 8px 12px; text-align: left; }
+.doc-markdown th { background: var(--doc-code-bg); font-weight: 600; color: var(--doc-text-2); }
+.doc-markdown tbody tr:nth-child(even) td { background: rgba(255, 255, 255, 0.03); }
+[data-doc-theme='light'] .doc-markdown tbody tr:nth-child(even) td { background: rgba(0, 0, 0, 0.02); }
+
+/* ===== 图片 ===== */
+.doc-markdown img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 16px auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* ===== 任务列表 ===== */
+.doc-markdown input[type='checkbox'] { margin-right: 6px; vertical-align: middle; }
+
+/* ===== 窄屏适配 ===== */
+@media (max-width: 768px) {
+  .doc-paper-scroll { padding: 12px 8px 24px; }
+  .doc-markdown { padding: 28px 20px 24px; border-radius: 10px; font-size: 15px; }
+  .doc-markdown h1 { font-size: 24px; }
+  .doc-markdown h2 { font-size: 20px; }
+  .doc-markdown h3 { font-size: 17px; }
+}

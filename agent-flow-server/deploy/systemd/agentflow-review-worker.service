@@ -1,0 +1,22 @@
+[Unit]
+Description=AgentFlow expense pre-review worker (ARQ queue: expense-review)
+After=network-online.target redis-server.service postgresql.service minio.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agentflow
+Group=agentflow
+WorkingDirectory=/opt/agentflow/agent-flow-server
+EnvironmentFile=/opt/agentflow/agent-flow-server/.env
+# 该 worker 负责 AI 初审：没有它，所有新提交的报销单会一直停留在 pending
+ExecStart=/opt/agentflow/agent-flow-server/.venv/bin/arq app.worker.expense_review_task.WorkerSettings
+Restart=always
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=30
+StandardOutput=append:/var/log/agentflow/review-worker.log
+StandardError=append:/var/log/agentflow/review-worker.err.log
+
+[Install]
+WantedBy=multi-user.target

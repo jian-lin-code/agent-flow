@@ -1,0 +1,122 @@
+name: agentflow
+
+x-backend: &backend
+  image: agentflow/server:${TAG:-latest}
+  build:
+    context: ./agent-flow-server
+  env_file: .env
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "50m"
+      max-file: "3"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agentflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-agent_flow}
+      TZ: Asia/Shanghai
+    # 连接池预算：api/chat/rag/review 各 20 条（pool 10 + overflow 10），再留出余量
+    # shared_buffers 按内存调整：16G → 1GB，8G → 512MB，4G → 256MB，2G → 128MB
+    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=1GB"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentflow} -d ${POSTGRES_DB:-agent_flow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # noeviction：ARQ 队列 key 绝不能被内存策略淘汰，否则任务直接丢失
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?请在 .env 中设置 MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?请在 .env 中设置 MINIO_ROOT_PASSWORD}
+      TZ: Asia/Shanghai
+    volumes:
+      - miniodata:/data
+    ports:
+      # 9000 必须让浏览器可访问（文件直链）；建议安全组限制来源 IP
+      - "9000:9000"
+      # 控制台只给内网
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      # 若该镜像不含 mc，这里会一直显示 unhealthy，但 minio 未加入其它服务的 depends_on，
+      # 不会阻塞启动；此时直接删除本段 healthcheck 即可
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  api:
+    <<: *backend
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  chat-worker:
+    <<: *backend
+    command: ["arq", "app.worker.chat_task.WorkerSettings"]
+
+  rag-worker:
+    <<: *backend
+    command: ["arq", "app.worker.rag_task.WorkerSettings"]
+
+  review-worker:
+    <<: *backend
+    command: ["arq", "app.worker.expense_review_task.WorkerSettings"]
+
+  web:
+    image: agentflow/admin:${TAG:-latest}
+    build:
+      context: ./agent-flow-admin
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:

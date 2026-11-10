@@ -1,0 +1,21 @@
+[Unit]
+Description=AgentFlow RAG worker (ARQ queue: rag-flow)
+After=network-online.target redis-server.service postgresql.service minio.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agentflow
+Group=agentflow
+WorkingDirectory=/opt/agentflow/agent-flow-server
+EnvironmentFile=/opt/agentflow/agent-flow-server/.env
+ExecStart=/opt/agentflow/agent-flow-server/.venv/bin/arq app.worker.rag_task.WorkerSettings
+Restart=always
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=30
+StandardOutput=append:/var/log/agentflow/rag-worker.log
+StandardError=append:/var/log/agentflow/rag-worker.err.log
+
+[Install]
+WantedBy=multi-user.target
