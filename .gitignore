@@ -17,6 +17,10 @@ agent-flow-admin/dist/
 # ===== 本地临时文件 =====
 temp/
 
+# ===== 本地文档（仅本地保留，不入库）=====
+/AgentFlow-Docker部署指南.md
+/AgentFlow上线前测试报告.md
+
 # ===== WorkBuddy 会话数据 =====
 .workbuddy/
 
