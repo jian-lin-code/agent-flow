@@ -2,6 +2,7 @@
 
 > 适用版本：当前仓库（`agent-flow-server` + `agent-flow-admin`）
 > 部署方式：单机 Docker Compose（API + 3 个 Worker + PostgreSQL + Redis + MinIO + Nginx）
+> 服务器基线：**4 核 4G / 100G SSD / 5Mbps**（个人与小团队自用，详见 1.5；更高规格按 1.1 表调整）
 > 文档性质：部署方案与操作手册，**本文不代替实际执行**。所有路径以仓库根目录 `agent-flow/` 为基准。
 
 ---
@@ -12,11 +13,12 @@
 
 | 场景 | 规格 | 适用规模 | 说明 |
 | --- | --- | --- | --- |
-| 内部试用 / POC | **4 核 8G**，100G SSD，5Mbps | ≤ 30 人，日对话 ≤ 300 轮 | 全套容器单机跑，够用但无冗余 |
-| **正式生产（推荐首版）** | **8 核 16G**，200G SSD，10~20Mbps | 100~300 人，日对话 2000~3000 轮，同时在线对话 10~20 | 单机 Compose 全套，预留了 PG / MinIO / 解析峰值内存 |
-| 规模化 / 多部门 | **16 核 32G** + 200G SSD，PG 独立 4C8G、Redis 独立 | 日对话 5000 轮以上 | Worker 水平扩容，数据库与对象存储独立 |
+| 极限压线 / 单人试用 | 2 核 2G，40G SSD，2Mbps | 1~2 人 | 必须 4G swap，见 1.6；不建议长期用 |
+| **个人 / 小团队（本次方案）** | **4 核 4G**，100G SSD，5Mbps | ≤ 10 人，日对话 ≤ 200 轮，同时在线对话 1~3 | 单机 Compose 全套，需 2G swap 兜底，见 1.5 |
+| 部门级正式生产 | 8 核 16G，200G SSD，10~20Mbps | 100~300 人，日对话 2000~3000 轮，同时在线 10~20 | 预留 PG / MinIO / 解析峰值内存，无内存焦虑 |
+| 规模化 / 多部门 | 16 核 32G + 200G SSD，PG 独立 4C8G、Redis 独立 | 日对话 5000 轮以上 | Worker 水平扩容，数据库与对象存储独立 |
 
-**推荐首版直接上 8C16G。** 4C8G 能跑，但知识库解析大 PDF 时（rag-worker）内存峰值会顶到 1~1.5G，连同 PostgreSQL、MinIO、3 个 Worker 一起容易触发 OOM Kill，表现为"文档一直 indexing""消息突然中断"。
+**本次按 4 核 4G 落地。** 这一档的边界要说清楚：常驻内存约 2G，解析大 PDF 时峰值会顶到 3.5~3.8G，所以 **2G swap 是必需项而非可选项**；同时在线对话超过 3 个、或同时解析多份大文档时会排队变慢，但不会挂掉。真要接 10 人以上、或一天几百轮对话，还是直接上 8C16G——4G 的问题从来不是"跑不动"，而是"没有余量应对峰值"。
 
 ### 1.2 为什么不需要 GPU
 
@@ -48,20 +50,63 @@
 | `web`（nginx） | 20~30MB | 50MB | < 0.1 核 | 静态资源 + 反向代理 |
 | **合计** | **约 2~2.5GB** | **约 5~6GB** | **3~5 核** | 8C16G 有充足余量 |
 
+**落到 4 核 4G 上是什么水位**：常驻约 2G（api 300 + chat 350 + rag 400 + review 300 + pg 300 + redis 100 + minio 200 + nginx 30），系统与页缓存再占 400~600M，平时余量约 1.2~1.5G。唯一能把内存顶满的动作是 `rag-worker` 解析大 PDF（峰值 1~1.5G），所以 4G 机器的原则是：**留 2G swap 兜底，别同时解析多份大文档**。CPU 侧 4 核足够——瓶颈在外部 API 的 RTT 和配额，不在本机算力。
+
 ### 1.4 其他硬指标
 
 | 项目 | 建议 | 原因 |
 | --- | --- | --- |
-| 磁盘 | SSD，≥ 100G（生产 200G） | 后端镜像约 1.2~1.5G，前端镜像约 300M；会话消息与 `document_chunks` 增长较快；MinIO 存原始文件 |
-| 带宽 | 出网 ≥ 5Mbps，建议 10~20Mbps | 上传发票/文档是主要流量；LLM 走外网，需稳定出口 |
+| 磁盘 | SSD，≥ 100G（4C4G 方案即按 100G 规划；生产 200G） | 后端镜像约 1.2~1.5G，前端镜像约 300M；会话消息与 `document_chunks` 增长较快；MinIO 存原始文件 |
+| 带宽 | 4C4G 配 5Mbps 起；多人使用建议 10~20Mbps | 上传发票/文档是主要流量；LLM 走外网，需稳定出口 |
 | 地域 | 与 DashScope 同地域（华东上海 / 华北北京） | LLM 调用占比高，就近访问可降低 RTT（收益有限但无成本） |
 | 操作系统 | Ubuntu 22.04 / 24.04 LTS，x86_64 | 官方 Docker 支持最好；ARM 也能跑但部分 wheel 需编译 |
-| Swap | 4G（`vm.swappiness=10`） | 兜底防 OOM，不作为常规内存使用 |
+| Swap | 4G 机型 **2G**；8G 以上机型 4G（`vm.swappiness=10`） | 兜底防 OOM，不作为常规内存使用。4C4G 必须配，否则解析大 PDF 会直接 OOM Kill |
 | 外网访问 | 必须能访问 DashScope、MinerU、rerank、Jev/OpenRouter 域名 | 任一不通会导致对应意图直接失败 |
 
 > 若公司网络有出口白名单，请提前放行：`dashscope.aliyuncs.com`、`mineru.net`、rerank 的 MaaS 域名、`openrouter.ai`（或 `jevmodel.org`）。
 
-### 1.5 2核2G 的小机器能跑吗（如 Flexus L 实例：2C2G/40G/2Mbps/100G 流量）
+### 1.5 4 核 4G 怎么配（本次部署方案）
+
+**结论：个人与小团队（≤ 10 人）这一档最划算，能稳定跑。前提是三件事：2G swap、PG 参数下调、镜像串行构建。**
+
+**内存预算**
+
+| 组件 | 常驻 | 峰值 | 备注 |
+| --- | --- | --- | --- |
+| api | ~300MB | 500MB | SSE 长连接会多占一点 |
+| chat-worker | ~350MB | 700MB | 单路对话；`max_jobs` 只是上限 |
+| rag-worker | ~400MB | **1~1.5GB** | 解析大 PDF 时唯一能顶满内存的进程 |
+| review-worker | ~300MB | 500MB | 与 chat-worker 同源，空闲占用接近 |
+| postgres | ~300MB | 500MB | 下调 `shared_buffers` 之后 |
+| redis / minio / nginx | ~350MB | 450MB | 数据量小 |
+| **合计** | **约 2GB** | **3.5~3.8GB** | 系统与页缓存还需 400~600MB |
+
+平时余量 1.2~1.5G；解析大文档时超出的部分由 swap 承接，会慢一些，但不会 OOM。
+
+**必须做的四件事（缺一项都可能踩坑）**
+
+1. **加 2G swap**（4G 机器够用，`swappiness=10` 只在真紧张时才用）：
+   ```bash
+   sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+   sudo mkswap /swapfile && sudo swapon /swapfile
+   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+   echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+   ```
+2. **PostgreSQL 降参**：`max_connections=150`、`shared_buffers=256MB`。4.5 节的 compose 已按 4G 写好，直接抄。
+3. **镜像串行构建**：`docker compose build` 默认并行，前后端同时构建瞬时吃 1.5~2G，容易把机器顶死。改成 `docker compose build api` 再 `docker compose build web`；更稳的是本地构建后推镜像（见 5.1）。
+4. **不要扩容**：不加 `--scale`、不给 api 加 `--workers`，4 核撑不住多副本同时抢 CPU。
+
+**使用预期（5Mbps 带宽）**
+
+- 首屏：gzip 后 1.5~2 秒
+- 单轮对话：5~15 秒，时间基本花在模型 API，CPU 不是瓶颈
+- 上传 5MB 发票：约 8~10 秒
+- 1~3 人日常：CPU 峰值 < 60%，内存稳定在 2.2~2.6G
+- 大 PDF（>30MB）解析：1~3 分钟，期间其他对话略慢，可接受
+
+**什么时候该升到 8G**：同时在线对话 > 3、需要频繁解析大文档、接入 10 人以上，或想把 `rag-worker` 并发提到 2。这几种情况下 swap 会变成常态，体验明显下降。
+
+### 1.6 2 核 2G 能不能跑（参考，Flexus L 类实例：2C2G/40G/2Mbps/100G 流量）
 
 **能跑，但属于压线配置，必须做下面的减配调整。** 个人使用（1~5 人）时同时只有 1 个对话/解析任务在跑，Worker 的 `max_jobs=4` 只是上限不会真用满，实际内存占用比 1.3 节的估算低不少：
 
@@ -96,12 +141,12 @@
 - **40G 磁盘**：镜像约 2.5G + 系统约 5G，剩余给数据，个人用足够；定期 `docker image prune -f`。
 - **大 PDF（>30MB）解析**可能触发 swap 变慢，耐心等即可，不影响其他功能。
 
-**结论**：纯自用、预算敏感 → 2C2G + 上面的调整可以用；预算再加 ¥50/月 左右升到 **2核4G** 是体验最优解（不用 swap，解析大文档也不慌），按 1.1 的建议 4C8G 则是"多人用也不用心"的档位。
+**结论**：纯自用、预算极度敏感 → 2C2G 加上述调整勉强能用，但解析大文档基本靠 swap 熬；加约 ¥50/月 升到 **4 核 4G**（1.5 节的方案）是成本与体验的最优平衡点；多人使用按 1.1 表上 8C16G。
 
-### 1.6 单机够不够？什么时候拆分
+### 1.7 单机够不够？什么时候拆分
 
 
-- **首版：单机 8C16G 一体化部署即可。** 组件之间通过 Docker 内网通信，无额外网络开销。
+- **首版：单机一体化部署即可**（4C4G 覆盖 10 人内，8C16G 覆盖百人级）。组件之间通过 Docker 内网通信，无额外网络开销。
 - 出现以下情况再拆分：
   1. `document_chunks` 超过 100 万行、向量检索变慢 → PostgreSQL 独立（4C8G + SSD）；
   2. 附件/文档总量超过 50G → MinIO 换成云 OSS（需改 `minio_client` 的 URL 拼接逻辑）；
@@ -154,7 +199,8 @@
 
 ### 3.1 清单
 
-- [ ] 服务器（推荐 8C16G / 200G SSD），已装 Docker Engine ≥ 24 与 Compose Plugin
+- [ ] 服务器（本次：**4 核 4G / 100G SSD**，已装 Docker Engine ≥ 24 与 Compose Plugin）
+- [ ] 系统盘已加 **2G swap**（4G 机型必需，命令见 1.5）
 - [ ] 域名（可选但强烈建议）与 HTTPS 证书
 - [ ] 安全组放行：`80`、`443`、`9000`（MinIO；可限制来源 IP）
 - [ ] 外部服务凭据：DashScope API Key、MinerU Token、Rerank 地址与 Key、Jev/OpenRouter Key
@@ -372,8 +418,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-agent_flow}
       TZ: Asia/Shanghai
     # 连接池预算：api/chat/rag/review 各 20 条（pool 10 + overflow 10），再留出余量
-    # shared_buffers 按内存调整：16G → 1GB，8G → 512MB，4G → 256MB
-    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=1GB"]
+    # 按机器内存调整：4C4G → 150 / 256MB（本文基线）；8G → 200 / 512MB；16G → 200 / 1GB
+    command: ["postgres", "-c", "max_connections=150", "-c", "shared_buffers=256MB"]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./deploy/docker/initdb:/docker-entrypoint-initdb.d:ro
@@ -467,6 +513,15 @@ volumes:
 ```
 
 > **不要给服务加 `container_name`**。否则 7.4 节的 `--scale` 会因容器名冲突失败。
+
+> **4C4G 可选加固：给单服务加内存上限**。默认情况下一个 worker 吃满内存会拖垮整机，加上限能让它自己被 OOM Kill 而不是连带数据库。确认过峰值后再启用（超限是"直接杀掉"而不是"变慢"）：
+>
+> ```yaml
+> # 加在 x-backend 锚点（api 与 3 个 worker 共用）与各服务下
+> mem_limit: 768m          # chat/rag/review-worker 建议 768m，api 640m
+> ```
+>
+> 参考配额（总和不超过 3.4G，留 600M 给系统）：api 640m、3 个 worker 各 768m、postgres 512m、minio 256m、redis 192m、web 64m。
 
 ### 4.6 `.env`（生产配置，放仓库根目录，`chmod 600`）
 
@@ -592,6 +647,12 @@ docker images | grep agentflow
 ```
 
 首次构建约 3~6 分钟（依赖下载）。
+
+> **4 核 4G 必须串行构建。** `docker compose build` 默认并行构建前后端，node 构建阶段瞬时占用 1.5~2G，和正在跑的服务叠加极易 OOM。两种做法：
+> 1. 分开构建：`docker compose build api` → `docker compose build web`（顺序执行，峰值不叠加）；
+> 2. 更稳：本地或 CI 构建后推镜像仓库，服务器只 `docker compose pull`，完全不在服务器上编译。
+>
+> 构建前先确认 swap 已生效：`free -h` 的 Swap 一行应是 `2.0Gi`。
 
 ### 5.2 先起基础组件
 
@@ -772,6 +833,16 @@ TAG=<上一个版本号> docker compose up -d
 
 > **经验**：ARQ worker 不热加载代码。改了任何 `app/` 下的代码，只重启 api 不够，三个 worker 必须一起重建，否则会出现"新接口配旧 worker"，表现为字段缺失、指标时有时无。
 
+> **4C4G 升级注意**：上面的 `docker compose build` 是并行构建、且服务还在跑，4G 机器很容易 OOM。稳妥做法是先停业务再串行构建：
+>
+> ```bash
+> docker compose stop api chat-worker rag-worker review-worker web
+> docker compose build api && docker compose build web
+> docker compose up -d
+> ```
+>
+> 或者本地 / CI 构建后推镜像，服务器只 `docker compose pull && docker compose up -d`，更省内存也更快。
+
 ### 7.3 备份
 
 ```bash
@@ -812,10 +883,10 @@ docker compose up -d --scale chat-worker=2
 docker compose ps | grep chat-worker
 ```
 
-- 每个 chat-worker 进程会开 20 条数据库连接，扩副本前确认 PG `max_connections` 足够（8C16G 建议 200，极限可到 300）。
-- 同样可 `--scale rag-worker=2`（文档解析高峰）。
+- 每个 chat-worker 进程会开 20 条数据库连接，扩副本前确认 PG `max_connections` 够（4C4G 默认 150；8C16G 用 200，极限 300）。
+- 同样可 `--scale rag-worker=2`（文档解析高峰）。**但 4C4G 不要扩**：每个副本额外 400MB 常驻 + 解析峰值 1G，会直接把机器打进 swap。
 
-**加 API 并发**：在 compose 的 api command 里加 `--workers 2`，但每个 uvicorn worker 各自建连接池，连接数翻倍，需同步调整 PG 参数；单机 8C 不建议超过 2。
+**加 API 并发**：在 compose 的 api command 里加 `--workers 2`，但每个 uvicorn worker 各自建连接池，连接数翻倍，需同步调整 PG 参数。**4C4G 保持单 worker**，8C 机器最多 2 个。
 
 **估算公式**：日对话轮数 ÷ 2000 ≈ chat-worker 副本数（单次对话 5~15s，单进程并发 4）。
 
@@ -843,7 +914,8 @@ docker compose exec -T postgres psql -U agentflow -d agent_flow \
 | --- | --- |
 | 容器重启次数 | 10 分钟内 > 2 次告警 |
 | `check_expense_review_health.py` 退出码 | 非 0 告警 |
-| PG 连接数 | > 150 告警 |
+| PG 连接数 | > 120 告警（4C4G 上限 150） |
+| 内存 / Swap | 可用内存 < 300MB，或 swap 持续占用 > 500MB 告警（说明该升配了） |
 | 磁盘使用率 | > 80% 告警 |
 | `workflow_runs` 失败率 | 5 分钟内 > 10% 告警 |
 
@@ -875,7 +947,7 @@ docker builder prune -f --filter until=168h
 | `type "vector" does not exist` | 用了普通 postgres 镜像或未建扩展 | 换 `pgvector/pgvector:pg16`，执行 `CREATE EXTENSION vector` |
 | `too many connections` | API/worker 副本多、连接池叠加 | 提高 `max_connections` 或调小 `pool_size`（`app/core/database.py`） |
 | 时间显示差 8 小时 | 容器时区不是东八区 | 所有服务加 `TZ=Asia/Shanghai` |
-| 容器反复 OOM 重启（exit 137） | 内存不足，rag 解析峰值 | 升到 16G 或加 swap；限制 `rag-worker` 并发（`max_jobs`） |
+| 容器反复 OOM 重启（exit 137） | 内存不足，rag 解析峰值 | 4C4G：先确认 2G swap 已生效（`free -h`）、镜像是串行构建、没同时解析多份大文档；仍频繁就升 8G，或把 `rag_task.py` 的 `max_jobs` 从 4 调到 1~2 |
 | 改了代码但行为没变 | worker 未重建 | `docker compose up -d --build` 全量重建 |
 
 ---
@@ -914,8 +986,8 @@ docker builder prune -f --filter until=168h
 
 | 档位 | 典型规格 | 参考价（华东，按量/包年） |
 | --- | --- | --- |
-| 试用 | 4C8G + 100G SSD | 约 ¥300~500/月 |
-| 生产 | 8C16G + 200G SSD | 约 ¥700~1200/月 |
+| 个人 / 小团队（本次） | 4C4G + 100G SSD，5Mbps | 约 ¥150~250/月（轻量应用服务器档） |
+| 部门生产 | 8C16G + 200G SSD | 约 ¥700~1200/月 |
 | 规模化 | 16C32G + 500G SSD，另加 RDS | 约 ¥2000~3500/月 |
 
 > 外加对象存储与外部 AI API 费用：对话成本主要在 DashScope Token（按量计费），文件解析按 MinerU 调用次数计费。首版不建议自建对象存储替代 MinIO，改造点在 URL 拼接与预签名逻辑。

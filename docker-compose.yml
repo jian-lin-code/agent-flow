@@ -4,14 +4,14 @@ x-backend: &backend
   image: agentflow/server:${TAG:-latest}
   build:
     context: ./agent-flow-server
-  env_file: .env
-  restart: unless-stopped
-  logging:
+  env_file: .env #根目录下的.env
+  restart: unless-stopped #崩溃自动重启
+  logging: # 限制日志大小，防止撑爆硬盘
     driver: json-file
     options:
       max-size: "50m"
       max-file: "3"
-  depends_on:
+  depends_on: # 等数据库和 Redis 启动好了才能运行
     postgres:
       condition: service_healthy
     redis:
@@ -28,8 +28,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-agent_flow}
       TZ: Asia/Shanghai
     # 连接池预算：api/chat/rag/review 各 20 条（pool 10 + overflow 10），再留出余量
-    # shared_buffers 按内存调整：16G → 1GB，8G → 512MB，4G → 256MB，2G → 128MB
-    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=1GB"]
+    # 按机器内存调整：4C4G → 150 / 256MB（当前基线）；8G → 200 / 512MB；16G → 200 / 1GB；2G → 100 / 128MB
+    command: ["postgres", "-c", "max_connections=150", "-c", "shared_buffers=256MB"]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./deploy/docker/initdb:/docker-entrypoint-initdb.d:ro
@@ -59,8 +59,8 @@ services:
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?请在 .env 中设置 MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?请在 .env 中设置 MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       TZ: Asia/Shanghai
     volumes:
       - miniodata:/data
