@@ -505,7 +505,7 @@ class AdvancedMarkdownChunker:
             line = lines[i]
 
             # 更新标题路径。
-            heading_match = cls.HEADER_PATTERN.match(line.strip())
+            heading_match = cls.HEADER_PATTERN.match(line.strip()) # Markdown 标题匹配规则
 
             if heading_match:
                 level = len(heading_match.group(1))
@@ -657,7 +657,7 @@ class AdvancedMarkdownChunker:
         for idx, line in enumerate(lines):
             line_number = idx + 1
 
-            heading_match = cls.HEADER_PATTERN.match(line.strip())
+            heading_match = cls.HEADER_PATTERN.match(line.strip()) # Markdown 标题匹配规则
 
             if heading_match:
                 # 先保存上一个标题下的正文。
@@ -788,7 +788,7 @@ class AdvancedMarkdownChunker:
             section_length = len(section.content.strip())
 
             # 长章节不参与合并，独立成组。
-            if section_length >= self.short_section_threshold:
+            if section_length >= self.short_section_threshold: # 250
                 flush()
 
                 groups.append(
@@ -823,8 +823,8 @@ class AdvancedMarkdownChunker:
 
             # 当前分组已经达到目标长度，或者加入后超过最大长度。
             if (
-                current_length >= self.section_merge_target
-                or candidate_length > self.section_merge_max_size
+                current_length >= self.section_merge_target # 600
+                or candidate_length > self.section_merge_max_size #加上这个章节后的字数
             ):
                 flush()
                 current_sections = [section]
@@ -988,10 +988,10 @@ class AdvancedMarkdownChunker:
                 每个章节在 group_text 中的字符范围及原始 Section 信息。
         """
 
-        parts: list[str] = []
-        segments: list[dict[str, Any]] = []
+        parts: list[str] = [] # 攒字符串片段
+        segments: list[dict[str, Any]] = [] # 账本
 
-        cursor = 0
+        cursor = 0 # 当前写到第几个字符了（游标）
 
         for section in group.sections:
             # 章节之间添加两个换行符。
@@ -1414,7 +1414,7 @@ class AdvancedMarkdownChunker:
             )
 
             raise TypeError("content 必须是字符串")
-
+        # 统一文本换行符
         source_text = self._normalize_newlines(content)
         # 清理文档中的空 HTML 锚点，保留换行结构。
         source_text = self._remove_empty_html_anchors(source_text)
@@ -1503,6 +1503,7 @@ class AdvancedMarkdownChunker:
                 ctx=ctx,
             )
 
+            # 把文档的表格提取出来，原本表格位置替换为  AF_TABLE_xxxx  protected_lines：不包含表格的所有行，tables：所有的表格
             protected_lines, tables = self._extract_tables(
                 original_lines
             )
@@ -1550,7 +1551,7 @@ class AdvancedMarkdownChunker:
         # ----------------------------------------------------
         # 5. 合并短章节
         # ----------------------------------------------------
-
+        # section_groups： list[SectionGroup]
         section_groups = self._merge_short_sections(
             sections
         )
@@ -1633,7 +1634,7 @@ class AdvancedMarkdownChunker:
                 # 6.2 找出父块涉及的章节
                 # ------------------------------------------------
 
-                parent_intersections = self._get_intersections(
+                parent_intersections = self._get_intersections( # 拿父块的字符区间，去和账本里各章节的区间求交集，算出「这个父块落在哪些章节、各占多少」
                     group_segments,
                     parent_start_offset,
                     parent_end_offset,
