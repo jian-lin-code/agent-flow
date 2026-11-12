@@ -264,14 +264,19 @@ class ExpenseClaimService:
 
         return users[0]
 
-    async def get_claim_stats(self, *, user: User) -> dict:
+    async def get_claim_stats(self, *, user: User, scope: str | None = None) -> dict:
         """统计进行中 / 已完成 / 异常单据与本月累计申请。
 
-        普通用户统计自己的单据；admin 统计全部用户的单据但排除本人提交的申请
-        （与"待我审批"列表口径一致）。将来 VIEW_ALL_CLAIM_ROLES 中的审批角色
-        可看到包含本人单据在内的全部统计。
+        默认按角色取口径：普通用户统计自己的单据；admin 统计全部用户的单据
+        但排除本人提交的申请（与"待我审批"列表口径一致）。
+        将来 VIEW_ALL_CLAIM_ROLES 中的审批角色可看到包含本人单据在内的全部统计。
+
+        scope="mine" 强制按「本人提交的申请」统计（与"我的申请"列表口径一致），
+        供 admin 在「我的申请」页查看自己的报销数据，不受审批角色分支影响。
         """
-        if user.role in VIEW_ALL_CLAIM_ROLES:
+        if scope == "mine":
+            applicant_id, exclude_applicant_id = user.id, None
+        elif user.role in VIEW_ALL_CLAIM_ROLES:
             # 预留：专用审批账号 → 全量统计，不排除本人
             applicant_id, exclude_applicant_id = None, None
         elif user.role == ADMIN_ROLE:

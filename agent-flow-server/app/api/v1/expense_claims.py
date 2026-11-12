@@ -42,12 +42,13 @@ async def list_my_expense_claims(
     )
 
 
-@router.get("/stats", summary="报销单统计（进行中/已完成/异常/本月累计；管理员为全局统计）")
+@router.get("/stats", summary="报销单统计（进行中/已完成/异常/本月累计；默认管理员为全局统计，scope=mine 强制按本人申请统计）")
 async def get_my_expense_claim_stats(
     current_user: Annotated[User, Depends(get_current_user)],
     service: Annotated[ExpenseClaimService, Depends(get_expense_claim_service)],
+    scope: Annotated[str | None, Query(pattern="^(mine)$", description="mine=按当前用户提交的申请统计（我的申请页口径）")] = None,
 ):
-    return await service.get_claim_stats(user=current_user)
+    return await service.get_claim_stats(user=current_user, scope=scope)
 
 
 @router.get("/pending-approvals", summary="报销单列表（管理员，全部状态，连表最新预审与申请人）")

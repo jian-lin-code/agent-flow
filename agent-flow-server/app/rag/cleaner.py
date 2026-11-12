@@ -158,6 +158,16 @@ _ARTICLE_PATTERN = re.compile(rf"^第[ \t]*[{_CJK_NUM}\d]+[ \t]*条")
 # Markdown 列表 / 引用行前缀，用于判断行首缩进是否要保留。
 _MD_PREFIX_PATTERN = re.compile(r"^(?:[-*+][ \t]|\d+[.)][ \t]|>|#|\|)")
 
+# 加粗片段：**文本**（非贪婪，避免跨段误吞）
+_BOLD_SPAN_PATTERN = re.compile(r"\*\*(.+?)\*\*")
+
+# 整行加粗：行内只有一个加粗片段且没有其他可见文本（标题/小节名的常见转出形态），
+# 第二组捕获尾随的冒号等标点，去壳时原样保留
+_WHOLE_LINE_BOLD_PATTERN = re.compile(r"^[ \t]*\*\*(.+?)\*\*([ \t:：]*)$")
+
+# 表格行：以 | 开头（允许缩进）
+_TABLE_LINE_PATTERN = re.compile(r"^[ \t]*\|")
+
 # 中文字符，用于判断标题是否属于中文/英文双标题。
 _CJK_PATTERN = re.compile(r"[\u4e00-\u9fff]")
 _LATIN_PATTERN = re.compile(r"[A-Za-z]")
@@ -692,14 +702,21 @@ class DocumentCleaner:
 
         stats.hit("图片/装饰行", misc_removed)
 
-        # 5. 章节层级校正（第X章 / 第X节 / 第X条）。
+        # 5. 冗余强调清理：标题行/表格行/整行加粗里的 ** 是解析引擎的格式残留，
+        #    不承载强调语义，还会稀释向量、污染前端预览。
+        #    必须在标题层级校正之前：去掉星号的「第X条」行才能被识别为标题。
+        lines, stripped = self._strip_redundant_emphasis(lines)
+
+        stats.hit("冗余强调清理", stripped)
+
+        # 6. 章节层级校正（第X章 / 第X节 / 第X条）。
         #    必须在标题合并之前：否则「第二章 职责分工」和「第五条 员工职责」
         #    在层级校正前同为 H2，可能被误判成双标题合并掉。
         if normalize_headings:
             lines, fixed = self._normalize_heading_levels(lines)
             stats.hit("标题层级校正", fixed)
 
-        # 6. 相邻同级标题合并（中英文双标题）。
+        # 7. 相邻同级标题合并（中英文双标题）。
         if merge_headings:
             lines, merged = self._merge_adjacent_headings(lines)
             stats.hit("相邻标题合并", merged)
@@ -987,6 +1004,75 @@ class DocumentCleaner:
         latin_side = second if first_has_cjk else first
 
         return bool(_LATIN_PATTERN.search(latin_side))
+
+    def _strip_redundant_emphasis(self, lines: list[str]) -> tuple[list[str], int]:
+        """
+        清理不承载强调语义的 ``**`` 标记。
+
+        docx/PDF 解析引擎会把 Word 的加粗文字（多为标题、表头）原样转成
+        Markdown 的 ``**…**``。这类加粗是格式残留而非强调：
+
+            - 标题行：标题本身已是结构信号，星号是纯噪声；
+            - 表格行：管道表首行天然是表头，星号是纯噪声；
+            - 整行加粗：事实上的标题（如 ``**第四条 工时制度**``），去星号；
+              若内容命中章/节/条模式，直接提升为对应层级标题，
+              让 heading_path 能接住这条结构信息；
+            - 行内强调（句中部分加粗）：真实的强调语义，原样保留。
+
+        Args:
+            lines: 文本行列表。
+
+        Returns:
+            (处理后的行列表, 清理的行数)。
+        """
+
+        cleaned = 0
+
+        for index, line in enumerate(lines):
+            stripped = line.strip()
+
+            if not stripped:
+                continue
+
+            # 1. 标题行：去掉 # 后标题文本里的所有加粗壳。
+            heading = _MD_HEADING_PATTERN.match(stripped)
+            if heading:
+                level, title = heading.group(1), heading.group(2)
+                new_title = _BOLD_SPAN_PATTERN.sub(r"\1", title)
+                if new_title != title:
+                    lines[index] = f"{level} {new_title}"
+                    cleaned += 1
+                continue
+
+            # 2. 表格行：表头加粗是引擎的固定行为，整行去壳。
+            if _TABLE_LINE_PATTERN.match(line):
+                new_line = _BOLD_SPAN_PATTERN.sub(r"\1", line)
+                if new_line != line:
+                    lines[index] = new_line
+                    cleaned += 1
+                continue
+
+            # 3. 整行加粗：去壳；命中章节条模式时提升为标题。
+            whole = _WHOLE_LINE_BOLD_PATTERN.match(stripped)
+            if whole:
+                inner, tail = whole.group(1).strip(), whole.group(2).strip()
+
+                if _CHAPTER_PATTERN.match(inner):
+                    lines[index] = f"## {inner}"
+                elif _SECTION_PATTERN.match(inner):
+                    lines[index] = f"### {inner}"
+                elif (
+                    _ARTICLE_PATTERN.match(inner)
+                    and len(inner) <= self.ARTICLE_TITLE_MAX_LEN
+                ):
+                    lines[index] = f"#### {inner}"
+                else:
+                    # 普通整行加粗：只去壳，保留尾随冒号等标点。
+                    lines[index] = f"{inner}{tail}"
+
+                cleaned += 1
+
+        return lines, cleaned
 
     def _normalize_heading_levels(self, lines: list[str]) -> tuple[list[str], int]:
         """

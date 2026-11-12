@@ -257,6 +257,63 @@ def test_plain_text_mode_skips_html_and_structure():
     assert "\n\n\n" not in cleaned
 
 
+# ============================================================
+# 冗余强调清理（** 噪声星号）
+# ============================================================
+
+def test_bold_in_headings_stripped():
+    """标题行里的 ** 是引擎格式残留，应去掉。"""
+    text = "## **第一章 总则**\n\n正文内容。"
+    cleaned, _ = get_cleaned(text)
+    assert "**" not in cleaned
+    assert "# 第一章 总则" in cleaned
+
+
+def test_bold_in_table_rows_stripped():
+    """表头加粗是引擎固定行为，管道表整行去壳。"""
+    text = "| **费用类别** | **说明** |\n| --- | --- |\n| 差旅费 | 出差产生的费用 |"
+    cleaned, _ = get_cleaned(text)
+    assert "**" not in cleaned
+    assert "| 费用类别 | 说明 |" in cleaned
+    # 数据行不受影响
+    assert "| 差旅费 | 出差产生的费用 |" in cleaned
+
+
+def test_whole_line_bold_article_promoted():
+    """整行加粗的条标题去壳并提升为 H4，heading_path 才能接住。"""
+    text = "## 第一章 总则\n\n**第四条 工时制度**\n\n公司实行标准工时制度。"
+    cleaned, _ = get_cleaned(text)
+    assert "**" not in cleaned
+    assert "#### 第四条 工时制度" in cleaned
+
+
+def test_whole_line_bold_chapter_promoted():
+    text = "**第一章 总则**\n\n正文。"
+    cleaned, _ = get_cleaned(text)
+    assert "## 第一章 总则" in cleaned
+
+
+def test_whole_line_bold_plain_stripped():
+    """非章节条的整行加粗只去壳，保留尾随标点。"""
+    text = "**重要提示**：\n\n正文内容。"
+    cleaned, _ = get_cleaned(text)
+    assert "**" not in cleaned
+    assert "重要提示：" in cleaned
+
+
+def test_inline_emphasis_preserved():
+    """句中部分加粗是真实强调语义，必须原样保留。"""
+    text = "员工**必须**当日提交申请，逾期不予受理。"
+    cleaned, _ = get_cleaned(text)
+    assert "员工**必须**当日提交申请" in cleaned
+
+
+def test_bold_cleanup_counts_in_stats():
+    text = "## **第一章 总则**\n\n| **类别** | **说明** |\n| --- | --- |\n| a | b |\n\n**第五条 考勤方式**\n\n正文。"
+    _, stats = get_cleaned(text)
+    assert stats.hits.get("冗余强调清理", 0) >= 3
+
+
 def test_empty_input():
     """空输入返回空字符串，不抛异常。"""
     cleaner = DocumentCleaner()

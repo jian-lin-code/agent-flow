@@ -140,8 +140,10 @@ export interface ApprovalDecisionPayload {
 export const listMyClaimsApi = (params: ClaimListFilter) =>
   request.get<ClaimPageResult>('/api/v1/expense-claims', { params })
 
-/** 我的申请统计 */
-export const getClaimStatsApi = () => request.get<ClaimStats>('/api/v1/expense-claims/stats')
+/** 报销单统计。scope='mine' 强制按当前用户提交的申请统计（「我的申请」页口径）；
+ *  不传时默认按角色取口径（admin 为「待我审批」全局统计）。 */
+export const getClaimStatsApi = (scope?: 'mine') =>
+  request.get<ClaimStats>('/api/v1/expense-claims/stats', scope ? { params: { scope } } : undefined)
 
 /** 报销单详情（按 claim_no 查询） */
 export const getClaimDetailApi = (claimNo: string) =>

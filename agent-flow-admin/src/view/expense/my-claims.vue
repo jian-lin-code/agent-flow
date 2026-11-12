@@ -5,11 +5,12 @@
       <div class="hero-left">
         <div class="hero-title-row">
           <h1>{{ $t('claims.employee.title') }}</h1>
-          <span class="hero-tag">{{ $t('claims.employee.tag') }}</span>
+          <!-- 与「待我审批」一致：展示当前用户的申请总数 -->
+          <span class="hero-tag" v-if="stats">{{ $t('claims.admin.tag', { n: stats.total }) }}</span>
         </div>
         <p class="hero-sub">{{ $t('claims.employee.sub') }}</p>
       </div>
-      <ClaimViewSwitch v-if="isAdmin" class="hero-switch" />
+      <ClaimViewSwitch v-if="isAdmin" class="hero-switch" :left-count="approvalsTotal" :right-count="stats?.total ?? null" />
       <button class="hero-cta" @click="router.push('/ai-chat')">
         <el-icon><ChatDotRound /></el-icon> {{ $t('claims.employee.goChat') }}
       </button>
@@ -234,6 +235,8 @@ const isAdmin = computed(() => userStore.userInfo?.role === 'admin')
 
 const stats = ref<ClaimStats | null>(null)
 const statsLoading = ref(false)
+/** 「待我审批」侧徽标数量（切换组件左侧，仅 admin 挂载切换器时拉取） */
+const approvalsTotal = ref<number | null>(null)
 const claims = ref<ExpenseClaimItem[]>([])
 const listLoading = ref(false)
 const total = ref<number | null>(null)
@@ -280,7 +283,8 @@ const currentFilter = () => ({
 const loadStats = async () => {
   statsLoading.value = true
   try {
-    const res = await getClaimStatsApi()
+    // 固定按「本人提交的申请」统计：admin 默认口径是待审批全局统计，与本页不匹配
+    const res = await getClaimStatsApi('mine')
     stats.value = res.data
   } finally {
     statsLoading.value = false
@@ -376,7 +380,15 @@ const copyClaimNo = async (no: string) => {
   await copyWithToast(no, t('claims.admin.copied'), t('claims.admin.copyFailed'))
 }
 
-onMounted(loadAll)
+onMounted(() => {
+  loadAll()
+  // 「待我审批」侧徽标数量（仅 admin 显示切换器；失败不影响页面，只是徽标不显示）
+  if (isAdmin.value) {
+    getClaimStatsApi()
+      .then((res) => { approvalsTotal.value = res.data.total })
+      .catch(() => {})
+  }
+})
 
 // 离开页面时清掉防抖定时器，避免切页后仍在后台发请求
 onBeforeUnmount(() => window.clearTimeout(searchTimer))
@@ -576,6 +588,8 @@ const resultClass = (r: string | null) =>
   .hero-title-row h1 { font-size: 21px; }
   .hero-cta { width: 100%; justify-content: center; }
   .hero-switch { width: 100%; justify-content: center; }
+  /* 统计卡田字型排列，与「待我审批」页一致 */
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* 分页收窄：隐藏每页条数与总数，居中显示，避免撑破容器。
      不再做 sticky 吸底：吸底时悬浮条会盖住表格最后一行，
      滚动到底的露出已由 MainLayout 的 ::after 底部占位块保证。 */
@@ -596,8 +610,5 @@ const resultClass = (r: string | null) =>
   .filter-date { max-width: none; flex: 1 1 100%; }
   .bar-actions { flex: 1; margin-left: 0; }
   .bar-actions .el-button { flex: 1; }
-}
-@media (max-width: 480px) {
-  .stats-grid { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

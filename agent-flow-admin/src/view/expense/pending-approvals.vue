@@ -9,8 +9,8 @@
         </div>
         <p class="hero-sub">{{ $t('claims.admin.sub') }}</p>
       </div>
-      <ClaimViewSwitch class="hero-switch" />
-      <button class="hero-cta" :disabled="listLoading" @click="loadClaims">
+      <ClaimViewSwitch class="hero-switch" :left-count="total" :right-count="mineTotal" />
+      <button class="hero-cta" :class="{ loading: listLoading }" :disabled="listLoading" @click="loadClaims">
         <el-icon><Refresh /></el-icon> {{ $t('claims.admin.refresh') }}
       </button>
     </section>
@@ -298,6 +298,8 @@ const statsLoading = ref(false)
 const claims = ref<ExpenseClaimItem[]>([])
 const listLoading = ref(false)
 const total = ref<number | null>(null)
+/** 「我的申请」侧徽标数量（切换组件右侧） */
+const mineTotal = ref<number | null>(null)
 const filterStatus = ref('')
 const keywordInput = ref('')
 const keyword = ref('')
@@ -467,7 +469,13 @@ const exportCsv = async () => {
 
 const onDecided = () => loadAll()
 
-onMounted(loadAll)
+onMounted(() => {
+  loadAll()
+  // 「我的申请」侧徽标数量（失败不影响页面，只是徽标不显示）
+  getClaimStatsApi('mine')
+    .then((res) => { mineTotal.value = res.data.total })
+    .catch(() => {})
+})
 
 // 离开页面时清掉防抖定时器，避免切页后仍在后台发请求
 onBeforeUnmount(() => window.clearTimeout(searchTimer))
@@ -538,6 +546,14 @@ const openAttachment = (a: ClaimAttachment) => {
 }
 .hero-cta:disabled { opacity: 0.6; cursor: not-allowed; }
 .hero-cta:hover:not(:disabled) { opacity: 0.9; }
+
+/* 刷新图标交互：悬停转一整圈；刷新中持续旋转 */
+.hero-cta .el-icon { transition: transform 0.6s ease; }
+.hero-cta:hover:not(:disabled) .el-icon { transform: rotate(360deg); }
+.hero-cta.loading .el-icon { animation: af-refresh-spin 0.8s linear infinite; }
+@keyframes af-refresh-spin {
+  to { transform: rotate(360deg); }
+}
 
 /* ===== 列表面板：卡片内分带（Tab 带 / 筛选带 / 表格 / 分页带），与设计稿一致 ===== */
 .list-panel { padding: 0; overflow: hidden; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25); }
