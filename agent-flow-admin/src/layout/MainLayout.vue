@@ -368,7 +368,7 @@ const onLogoutConfirm = () => {
 }
 
 .header-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
-.hamburger { display: none; font-size: 22px; color: var(--af-text-2); cursor: pointer; }
+.hamburger { display: none; font-size: 19px; color: var(--af-text-3); cursor: pointer; padding: 2px; }
 .logo-mini { display: none; align-items: center; gap: 8px; }
 .logo-mini-text { color: var(--af-text); font-weight: 700; font-size: 15px; }
 .current-page { font-size: 14px; color: var(--af-text-3); }
@@ -434,8 +434,15 @@ const onLogoutConfirm = () => {
 
   .layout-main {
     padding: 14px;
-    /* 底部导航栏高度 + 安全区域 */
-    padding-bottom: calc(62px + env(safe-area-inset-bottom));
+    /* iOS WebKit 不把滚动容器自身的 padding-bottom 计入可滚动区域，
+       会导致页面末尾内容被固定底部导航遮挡（iPhone 上按钮点不到）。
+       改用内容末尾占位块：属于内容本身，所有内核都会算进滚动高度。 */
+    padding-bottom: 0;
+  }
+  .layout-main:not(.no-padding)::after {
+    content: "";
+    display: block;
+    height: calc(62px + env(safe-area-inset-bottom));
   }
   .layout-main.no-padding { padding: 0 0 calc(62px + env(safe-area-inset-bottom)); }
 

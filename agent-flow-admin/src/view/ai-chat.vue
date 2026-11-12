@@ -1059,10 +1059,11 @@
           <el-input
             v-model="inputMsg"
             type="textarea"
-            :rows="3"
+            :rows="isMobileViewport ? 1 : 3"
             :placeholder="$t('chat.inputPlaceholder')"
             resize="none"
             class="custom-textarea"
+            :autosize="isMobileViewport ? { minRows: 1, maxRows: 4 } : false"
             @keydown.enter.exact.prevent="handleSend"
           />
           <div class="input-toolbar">
@@ -1359,6 +1360,14 @@ const loading = ref(false)
 const totalConversations = ref(0)
 const sessionsDrawer = ref(false)
 const sessionKeyword = ref('')
+
+// 移动端视口：输入框行数等按屏幕宽度降级，避免占满小屏高度
+const isMobileViewport = ref(false)
+const viewportQuery = window.matchMedia('(max-width: 768px)')
+const syncViewport = (e: MediaQueryList | MediaQueryListEvent) => { isMobileViewport.value = e.matches }
+syncViewport(viewportQuery)
+viewportQuery.addEventListener('change', syncViewport)
+onBeforeUnmount(() => viewportQuery.removeEventListener('change', syncViewport))
 
 // 草稿箱：切换会话时保留未发送的输入内容
 const drafts = ref<Record<string, string>>({})
@@ -4884,10 +4893,18 @@ onBeforeUnmount(() => {
 }
 @media (max-width: 768px) {
   .chat-sessions-sidebar { display: none; }
-  .mobile-menu-btn { display: block; }
-  .chat-messages { padding: 16px; gap: 20px; }
+  .mobile-menu-btn { display: block; font-size: 18px; color: var(--af-text-3); }
+  .chat-header { padding: 9px 14px; }
+  .chat-title { font-size: 14.5px; font-weight: 600; }
+  .chat-tag { padding: 3px 9px; font-size: 11px; gap: 5px; }
+  .chat-messages { padding: 12px 14px; gap: 16px; }
   .message-wrapper { max-width: 100%; }
-  .chat-input-area { padding: 12px 14px 8px; }
+  /* 移动端输入区压缩：单行起、小按钮，把纵向空间让给消息列表 */
+  .chat-input-area { padding: 8px 12px 6px; }
+  .input-container { padding: 8px 10px; border-radius: 12px; }
+  .custom-textarea :deep(.el-textarea__inner) { font-size: 14px; line-height: 1.5; }
+  .input-toolbar { margin-top: 5px; }
+  .send-btn { min-height: 32px; padding: 5px 13px; font-size: 12px; border-radius: 8px; }
   .input-disclaimer { display: none; }
 }
 </style>
