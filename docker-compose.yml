@@ -16,6 +16,7 @@ x-backend: &backend
       condition: service_healthy
     redis:
       condition: service_healthy
+  mem_limit: 768m
 
 services:
 
