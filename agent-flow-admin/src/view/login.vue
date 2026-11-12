@@ -43,15 +43,15 @@
           <div class="hero-stats">
             <div class="hero-stat">
               <div class="hs-label">{{ $t('login.stat1Label') }}</div>
-              <div class="hs-value orange">85% <span>{{ $t('login.stat1Sub') }}</span></div>
+              <div class="hs-value orange">{{ $t('login.stat1Value') }} <span>{{ $t('login.stat1Sub') }}</span></div>
             </div>
             <div class="hero-stat">
               <div class="hs-label">{{ $t('login.stat2Label') }}</div>
-              <div class="hs-value green">99.8% <span>{{ $t('login.stat2Sub') }}</span></div>
+              <div class="hs-value green">{{ $t('login.stat2Value') }} <span>{{ $t('login.stat2Sub') }}</span></div>
             </div>
             <div class="hero-stat">
               <div class="hs-label">{{ $t('login.stat3Label') }}</div>
-              <div class="hs-value">100% <span>{{ $t('login.stat3Sub') }}</span></div>
+              <div class="hs-value">{{ $t('login.stat3Value') }} <span>{{ $t('login.stat3Sub') }}</span></div>
             </div>
           </div>
           <div class="hero-pipeline">
@@ -156,7 +156,7 @@ const loading = ref(false)
 const rememberMe = ref(true)
 
 const loginForm = reactive({
-  username: 'employee',
+  username: 'admin',
   password: '123456'
 })
 
