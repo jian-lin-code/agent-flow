@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>财务报销管理制度</title>
+<style>
+  /* 页面规则：页眉页脚与命名页 */
+  @page {
+    @top-left { content: "财务报销管理制度"; font-family: SimSun; font-size: 9pt; color: #6B6B6B; }
+    @top-right { content: "AFP-FI-2026-002  V2.0"; font-family: SimSun; font-size: 9pt; color: #6B6B6B; }
+    @bottom-left { content: "AgentFlow 科技有限公司"; font-family: SimSun; font-size: 9pt; color: #6B6B6B; }
+    @bottom-center { content: "内部"; font-family: SimSun; font-size: 9pt; color: #6B6B6B; }
+    @bottom-right { content: "第 " counter(page) " 页"; font-family: SimSun; font-size: 9pt; color: #6B6B6B; }
+  }
+  @page coverpage {
+    @top-left { content: none; }
+    @top-right { content: none; }
+    @bottom-left { content: none; }
+    @bottom-center { content: none; }
+    @bottom-right { content: none; }
+  }
+  section[role="cover"] { page: coverpage; }
+  body { font-family: "SimSun", "宋体", serif; font-size: 12pt; color: #1A1A1A; margin: 0; }
+  p { text-indent: 2em; font-size: 12pt; line-height: 1.8; margin: 6pt 0; text-align: justify; }
+  p.plain { text-indent: 0; }
+  p.note { text-indent: 2em; font-size: 9.5pt; line-height: 1.6; color: #3A3A3A; background: #FAFAFA; padding: 6pt 8pt; margin: 4pt 0 8pt 0; }
+  h1.chapter { font-family: SimHei; font-size: 16pt; color: #1A1A1A; margin: 18pt 0 8pt 0; text-indent: 0; }
+  .cover-company { font-size: 14pt; color: #6B6B6B; text-align: center; text-indent: 0; margin-top: 90pt; }
+  .cover-title { font-size: 32pt; font-weight: bold; text-align: center; text-indent: 0; margin: 26pt 0 8pt 0; font-family: SimHei; }
+  .cover-en { font-size: 11pt; color: #6B6B6B; text-align: center; text-indent: 0; margin: 0 0 14pt 0; }
+  .cover-meta { font-size: 10.5pt; color: #1A1A1A; text-align: center; text-indent: 0; margin: 0 0 30pt 0; }
+  .cover-note { font-size: 9.5pt; color: #6B6B6B; text-align: center; text-indent: 0; margin-top: 46pt; }
+  table.doc { width: 100%; border-collapse: collapse; font-size: 10pt; margin: 8pt 0 12pt 0; }
+  table.doc th { background: #F1F1F1; font-family: SimHei; font-weight: normal; }
+  table.doc th, table.doc td { border: 0.5pt solid #C9C9C9; padding: 5pt 6pt; text-align: left; vertical-align: middle; line-height: 1.5; }
+  table.doc td.c { text-align: center; }
+  .toc-title { font-family: SimHei; font-size: 16pt; text-indent: 0; text-align: left; margin: 16pt 0 10pt 0; }
+  .toc-list, .toc-list ol, .toc-list ul { list-style: none; }
+  .toc-list li { font-size: 12pt; line-height: 2.0; text-indent: 0; }
+  .doc-toc { text-indent: 0; }
+  h2.sub { font-family: SimHei; font-size: 13pt; text-indent: 0; margin: 12pt 0 6pt 0; }
+</style>
+</head>
+<body>
+
+<section role="cover">
+  <p class="cover-company">AgentFlow 科技有限公司</p>
+  <p class="cover-title">财务报销管理制度</p>
+  <p class="cover-en">Financial Reimbursement Management Policy</p>
+  <p class="cover-meta">文件编号 AFP-FI-2026-002　·　版本 V2.0　·　密级 内部</p>
+  <table class="doc" style="width:70%;margin-left:15%;">
+    <tr><th style="width:26%;text-align:left;">文件编号</th><td>AFP-FI-2026-002</td></tr>
+<tr><th style="width:26%;text-align:left;">文件名称</th><td>财务报销管理制度</td></tr>
+<tr><th style="width:26%;text-align:left;">版本号</th><td>V2.0</td></tr>
+<tr><th style="width:26%;text-align:left;">密级</th><td>内部（限公司员工查阅）</td></tr>
+<tr><th style="width:26%;text-align:left;">编制部门</th><td>财务部</td></tr>
+<tr><th style="width:26%;text-align:left;">编制人</th><td>财务部</td></tr>
+<tr><th style="width:26%;text-align:left;">审核人</th><td>财务负责人</td></tr>
+<tr><th style="width:26%;text-align:left;">批准人</th><td>总经理</td></tr>
+<tr><th style="width:26%;text-align:left;">生效日期</th><td>2026 年 12 月 1 日</td></tr>
+<tr><th style="width:26%;text-align:left;">替代版本</th><td>V1.0（2025 年 3 月发布）</td></tr>
+<tr><th style="width:26%;text-align:left;">分发范围</th><td>全体员工</td></tr>
+<tr><th style="width:26%;text-align:left;">保管期限</th><td>长期；会计凭证按国家规定另行保管</td></tr>
+  </table>
+  <p class="cover-note">本文件为受控文件，请在公司内部网络查阅最新版本。</p>
+</section>
+
+<section>
+  <h2 class="sub">修订记录</h2>
+  <table class="doc">
+    <tr><th class="c">版本</th><th class="c">生效日期</th><th class="c">修订内容摘要</th><th class="c">编制</th><th class="c">批准</th></tr>
+    <tr><td class="c">版本</td><td class="c">生效日期</td><td>修订内容摘要</td><td class="c">编制</td><td class="c">批准</td></tr>
+<tr><td class="c">V1.0</td><td class="c">2025-03-15</td><td>首次发布。</td><td class="c">财务部</td><td class="c">总经理</td></tr>
+<tr><td class="c">V2.0</td><td class="c">2026-12-01</td><td>重构制度结构，按「总则—职责—范围—标准—凭证—流程—监督—附则」编排；明确智能审核系统（AI 初审）的辅助定位与责任边界；新增借款与预付款、凭证特殊情形、各环节时限与超期处理、违规处理对照表；调整差旅住宿与交通标准；补充线上办理要求。</td><td class="c">财务部</td><td class="c">总经理</td></tr>
+  </table>
+</section>
+
+<section role="cover">
+<nav class="doc-toc" aria-label="文档目录">
+  <p class="toc-title">目　　录</p>
+  <ol class="toc-list">
+    <li><a href="#section-1">第一章　总则</a></li>
+<li><a href="#section-2">第二章　职责分工</a></li>
+<li><a href="#section-3">第三章　报销范围</a></li>
+<li><a href="#section-4">第四章　报销标准</a></li>
+<li><a href="#section-5">第五章　报销凭证与单据要求</a></li>
+<li><a href="#section-6">第六章　报销流程与时限</a></li>
+<li><a href="#section-7">第七章　借款与预付款</a></li>
+<li><a href="#section-8">第八章　监督与违规处理</a></li>
+<li><a href="#section-9">第九章　附则</a></li>
+  </ol>
+</nav>
+</section>
+<section class="chapter" data-page-restart="1">
+<h1 class="chapter" id="section-1">第一章　总则</h1><p>第一条　【目的】为规范 AgentFlow 科技有限公司（以下简称「公司」）费用报销行为，明确报销范围、标准与审批流程，保障资金安全，提升运营效率，依据《中华人民共和国会计法》《企业会计准则》及公司相关管理制度，制定本制度。</p><p>第二条　【适用范围】本制度适用于公司全体在职员工、实习生，以及经授权使用公司费用额度的外部协作人员。公司分支机构、控股子公司参照本制度执行；另有规定的，从其规定。</p><p>第三条　【基本原则】</p><p>（一）真实合法。报销事项须真实发生，凭证合法有效，业务内容与凭证记载一致。</p><p>（二）预算控制。费用支出应在年度预算或经批准的专项预算内执行，超预算须先履行预算调整程序。</p><p>（三）权责对等。谁经办谁负责、谁审批谁负责，审批人对审批结论承担相应责任。</p><p>（四）时限管理。申请、审核、审批、付款各环节均设定时限，逾期按本制度处理。</p><p>（五）全程留痕。申请、凭证、审核意见、审批结论与付款记录完整留存，可追溯、可审计。</p><p>第四条　【制度衔接】本制度与《差旅管理办法》《采购管理制度》《预算管理制度》《授权审批权限表》配套执行。上述制度与本制度不一致的，以本制度为准；本制度未尽事项，按公司其他相关规定执行。</p><h1 class="chapter" id="section-2">第二章　职责分工</h1><p>第五条　【员工职责】</p><p>（一）费用发生后及时整理凭证，按本制度要求提交报销申请；</p><p>（二）对报销事项的真实性、凭证的合法性、金额的准确性负责；</p><p>（三）如实填报费用归属部门、项目或成本中心；</p><p>（四）配合财务部及审计人员的核查，按要求补充说明材料。</p><p>第六条　【部门负责人职责】</p><p>（一）审核本部门报销事项的业务真实性、必要性与合理性；</p><p>（二）确认费用归属与预算余额；</p><p>（三）在授权范围内行使审批权，不得越权审批，不得拆分单据规避审批。</p><p>第七条　【财务部职责】</p><p>（一）制定、解释与修订本制度，组织宣贯培训；</p><p>（二）复核报销凭证的合法性、完整性与标准合规性；</p><p>（三）办理付款、账务处理与凭证归档；</p><p>（四）按月出具费用分析报告，按季度组织报销抽查。</p><p>第八条　【审批人职责】各级审批人在授权范围内审批，重点审查事项必要性、标准合规性与预算影响。审批人对审批结论负责；对存疑事项应要求补充说明，不得以「已由他人审批」为由免除审核责任。</p><p>第九条　【智能审核系统定位】公司报销业务通过 AgentFlow 智能业务平台（以下简称「平台」）线上办理。平台在提交环节提供票据识别、明细结构化、制度符合性预审（以下简称「AI 初审」）等辅助能力，并生成初审报告。</p><p>AI 初审结论仅作为审批参考，不构成审批意见，不替代、不减轻各环节审核人的审核责任。审核人应结合初审报告独立判断；初审未覆盖或判断有误的，以人工审核结论为准。</p><h1 class="chapter" id="section-3">第三章　报销范围</h1><p>第十条　【可报销费用】与企业生产经营、日常办公及经批准项目相关的合理支出，按下列类别报销，并附对应佐证材料。</p><table class="doc"><tr><th>序号</th><th>费用类别</th><th>主要内容</th><th>必备附件</th></tr><tr><td class="c">1</td><td>差旅费</td><td>因公出差的交通、住宿、伙食补助、市内交通</td><td>出差审批单、行程单、发票</td></tr><tr><td class="c">2</td><td>业务招待费</td><td>接待客户及合作伙伴发生的餐饮、住宿、会务、场地费用</td><td>接待申请单、参与人名单、发票</td></tr><tr><td class="c">3</td><td>办公费</td><td>办公用品、耗材、打印复印、快递、水电物业、网络通讯</td><td>发票、验收或使用记录</td></tr><tr><td class="c">4</td><td>采购费</td><td>原材料、办公物资、固定资产、低值易耗品</td><td>采购申请、合同、入库验收单、发票</td></tr><tr><td class="c">5</td><td>私车公用</td><td>经审批使用个人车辆办理公务产生的燃油、路桥、停车费</td><td>私车公用审批单、里程记录、票据</td></tr><tr><td class="c">6</td><td>培训与会议费</td><td>员工培训、外部会议、场地与资料费用</td><td>培训或会议通知、签到表、发票</td></tr><tr><td class="c">7</td><td>专项支出</td><td>研发、市场推广、技术服务等经批准项目的支出</td><td>立项与预算批复、合同、发票</td></tr></table><p>第十一条　【不予报销情形】下列支出不予报销：</p><p>（一）与公司经营无关的个人消费，包括个人餐饮、购物、娱乐、健身、旅游及家庭开支；</p><p>（二）虚假、伪造、失效，或开票信息不符合本制度要求的凭证所对应的支出；</p><p>（三）超出报销标准且未履行审批手续的部分；</p><p>（四）行贿、挪用资金、公款私用等违法违规支出；</p><p>（五）因个人原因产生的罚款、赔偿、滞纳金；</p><p>（六）费用发生后超过规定时限提交且无正当理由的；</p><p>（七）应由个人承担或已由第三方承担的费用；</p><p>（八）其他不符合本制度及公司规定的支出。</p><h1 class="chapter" id="section-4">第四章　报销标准</h1><p>第十二条　【差旅费标准】差旅费按员工职级执行下表标准，住宿费按出差目的地城市类别分档。</p><table class="doc"><tr><th>项目</th><th>普通员工</th><th>部门负责人</th><th>公司领导</th></tr><tr><td class="c">城市间交通</td><td>高铁/动车二等座、火车硬卧；乘飞机经济舱须事前审批</td><td>高铁/动车一等座、飞机经济舱</td><td>高铁/动车商务座、飞机经济舱</td></tr><tr><td class="c">住宿：省会及直辖市</td><td>380 元/晚</td><td>480 元/晚</td><td>650 元/晚</td></tr><tr><td class="c">住宿：地级市</td><td>320 元/晚</td><td>420 元/晚</td><td>550 元/晚</td></tr><tr><td class="c">住宿：县及以下</td><td>280 元/晚</td><td>380 元/晚</td><td>500 元/晚</td></tr><tr><td class="c">伙食补助</td><td>50 元/天</td><td>50 元/天</td><td>50 元/天</td></tr><tr><td class="c">市内交通补助</td><td>60 元/天</td><td>60 元/天</td><td>60 元/天</td></tr></table><p class="note">说明：（一）伙食与市内交通实行定额补助，按实际出差天数计发，不再凭票报销；当日往返按半天计。（二）住宿费凭发票据实报销，不得超过上限；同性别员工同行原则上合住标准间。（三）出差期间由客户或合作方承担食宿的，不再计发对应补助。（四）因公务发生的招待、会议费用，按第十三条、第十六条另行报销。</p><p>第十三条　【业务招待费标准】</p><table class="doc"><tr><th>类别</th><th>人均上限</th><th>单次上限</th><th>审批要求</th></tr><tr><td class="c">普通接待</td><td>500 元</td><td>3,000 元</td><td>部门负责人审批</td></tr><tr><td class="c">重要接待</td><td>1,000 元</td><td>5,000 元</td><td>分管领导审批</td></tr><tr><td class="c">礼品</td><td>—</td><td>2,000 元</td><td>分管领导审批，注明用途与受赠对象</td></tr></table><p class="note">说明：招待费须事前申请，注明接待对象、事由、人数与预算；不得以招待名义报销内部聚餐。</p><p>第十四条　【办公与通讯费标准】</p><table class="doc"><tr><th>项目</th><th>标准</th><th>说明</th></tr><tr><td class="c">办公用品</td><td>实报实销</td><td>单次采购超 2,000 元须提前提交采购申请</td></tr><tr><td class="c">通讯补贴</td><td>普通员工 100 元/月；部门负责人 200 元/月；公司领导 300 元/月</td><td>按月随薪发放，超额部分自理</td></tr><tr><td class="c">水电、物业、网络</td><td>实报实销</td><td>由行政部统一核算，财务部统一支付</td></tr><tr><td class="c">打印复印、快递</td><td>实报实销</td><td>注明用途与接收人</td></tr></table><p>第十五条　【私车公用标准】私车公用须事前审批并如实登记里程。</p><table class="doc"><tr><th>职级</th><th>燃油补贴（元/公里）</th><th>备注</th></tr><tr><td class="c">普通员工</td><td>0.8</td><td>需提供里程记录</td></tr><tr><td class="c">部门负责人</td><td>1.0</td><td>需提供里程记录</td></tr><tr><td class="c">公司领导</td><td>1.2</td><td>需提供里程记录</td></tr></table><p class="note">说明：路桥费、停车费凭票据实报实销，须与公务行程对应；维修、保养、年检费用原则上不予报销，因公务发生的单次维修超过 2,000 元的须经分管领导审批。</p><p>第十六条　【培训、会议与专项支出】按经批准的项目预算执行，实报实销。超预算部分须先提交预算调整申请，经原审批人批准后方可报销。</p><p>第十七条　【标准调整】财务部每年结合物价水平、地区差异与公司经营情况评估报销标准，提出调整建议，报总经理批准后发布。标准调整自新版本生效之日起执行，不对生效日前的费用追溯适用。</p><h1 class="chapter" id="section-5">第五章　报销凭证与单据要求</h1><p>第十八条　【发票要求】</p><p>（一）发票须为合法有效的增值税发票或财政票据，抬头为公司全称，纳税人识别号准确无误；</p><p>（二）发票内容应真实反映交易，货物或服务名称、数量、单价、金额与业务一致，不得开具「办公用品一批」「礼品」等笼统名称而无明细清单；</p><p>（三）电子发票须上传原始 PDF 或 OFD 文件，不得使用截图；同一张电子发票不得重复报销，平台按发票号码自动查重；</p><p>（四）发票不得涂改、挖补；联次不齐、字迹模糊、印章不全的，不予受理。</p><p>第十九条　【特殊情形处理】</p><table class="doc"><tr><th>情形</th><th>处理方式</th></tr><tr><td class="c">发票丢失</td><td>取得开票方加盖公章的发票存根复印件或记账联复印件，附情况说明，经财务负责人审批</td></tr><tr><td class="c">跨年度费用</td><td>原则上不得跨年度报销；12 月费用最迟于次年 1 月 15 日前提交，计入实际报销年度</td></tr><tr><td class="c">境外票据</td><td>提供境外发票或收据原件、支付凭证及中文译本，按实际汇率折算</td></tr><tr><td class="c">超标准支出</td><td>超出标准部分由个人承担；特殊情况须事前审批并附书面说明</td></tr><tr><td class="c">小额零星支出</td><td>单笔 500 元以下可凭收款凭证报销，须注明收款方、金额、事由，并经部门负责人签字</td></tr></table><p>第二十条　【附件要求】报销申请须附与费用类别匹配的佐证材料。</p><table class="doc"><tr><th>费用类别</th><th>必备附件</th></tr><tr><td class="c">差旅费</td><td>出差审批单、行程单（机票/车票）、住宿发票</td></tr><tr><td class="c">业务招待费</td><td>接待申请单、参与人员名单、餐饮发票及消费明细</td></tr><tr><td class="c">采购费</td><td>采购申请、合同或订单、入库验收单</td></tr><tr><td class="c">私车公用</td><td>私车公用审批单、里程记录、燃油及路桥票据</td></tr><tr><td class="c">培训费</td><td>培训通知、报名回执、签到表</td></tr><tr><td class="c">专项支出</td><td>项目批复、预算文件、合同</td></tr></table><p>第二十一条　【单据整理】报销人应在平台中按费用类别逐项录入明细，一张发票对应一条明细，金额与税额填写准确；纸质附件按明细顺序编号，与线上记录一一对应。凭证粘贴不整齐、编号与线上不一致的，退回整理。</p><h1 class="chapter" id="section-6">第六章　报销流程与时限</h1><p>第二十二条　【流程】报销实行闭环管理，流程如下：</p><p>（一）发起申请。员工在平台对话中发起报销，填写事由、费用归属部门与项目，上传发票及附件。</p><p>（二）明细确认。平台自动识别票据要素并生成报销明细；要素缺失或字段不全的，员工须补全后提交。</p><p>（三）AI 初审。平台依据本制度对发票要素、标准适用与附件完整性进行预审，出具初审报告并标注疑似问题。</p><p>（四）部门审核。部门负责人审核业务真实性、必要性与预算余额。</p><p>（五）财务复核。财务部复核凭证合法性、标准合规性与附件完整性。</p><p>（六）审批。按《授权审批权限表》完成审批。</p><p>（七）付款与归档。财务部付款后完成账务处理与凭证归档。</p><p>第二十三条　【时限】各环节时限如下，按工作日计算，不含法定节假日。</p><table class="doc"><tr><th>环节</th><th>责任人</th><th>时限</th><th>超时处理</th></tr><tr><td class="c">提交申请</td><td>报销人</td><td>费用发生后 5 个工作日内</td><td>超期须书面说明；超过 10 个工作日不予报销</td></tr><tr><td class="c">明细补全</td><td>报销人</td><td>收到退回通知后 3 个工作日内</td><td>超期系统关闭申请，须重新发起</td></tr><tr><td class="c">部门审核</td><td>部门负责人</td><td>2 个工作日内</td><td>平台提醒；连续超时纳入管理考核</td></tr><tr><td class="c">财务复核</td><td>财务部</td><td>3 个工作日内</td><td>退回补正的重新计时</td></tr><tr><td class="c">审批</td><td>审批人</td><td>2 个工作日内</td><td>平台提醒并升级至上一级</td></tr><tr><td class="c">付款</td><td>财务部</td><td>审批通过后 2 个工作日内</td><td>每周二、周四集中付款</td></tr></table><p>第二十四条　【线上办理要求】</p><p>（一）公司报销业务统一在平台办理，不接受线下纸质单据直接报销；系统故障、境外紧急支出等特殊情形，经财务部同意可临时线下办理，并在 3 个工作日内补录。</p><p>（二）报销人应核对平台识别的发票要素，识别结果与实际不符的，须在提交前更正；提交后发现的，应在审核环节前主动撤回修改。</p><p>（三）AI 初审提示的问题，报销人应逐项确认或补充说明；未处理的提示项随单据流转至审核人。</p><p>第二十五条　【退回、驳回与申诉】</p><p>（一）退回补正。审核人发现材料不全或信息有误的，退回报销人补正，补正后重新进入审核流程。</p><p>（二）驳回。存在不予报销情形或虚假凭证的，审批人可驳回并注明理由。</p><p>（三）申诉。报销人对驳回结论有异议的，可在 5 个工作日内向财务部提交书面申诉；财务部会同相关部门在 5 个工作日内出具复核意见，仍有异议的报总经理裁定。</p><p>第二十六条　【付款与归档】</p><p>（一）报销款项通过银行转账支付至员工本人工资卡账户，原则上不支付现金。</p><p>（二）财务部按会计档案管理规定归档报销单据、审批记录与付款凭证，保存期限不少于 10 年；涉及专项资金的按相关规定延长。</p><p>（三）员工可在平台查询本人报销单的处理状态与历史记录。</p><h1 class="chapter" id="section-7">第七章　借款与预付款</h1><p>第二十七条　【借款】因公务需要预先支付款项的，可申请借款，审批权限如下。</p><table class="doc"><tr><th>借款金额</th><th>审批权限</th><th>备注</th></tr><tr><td class="c">5,000 元以下</td><td>部门负责人</td><td>须注明用途与预计核销时间</td></tr><tr><td>5,000 元至 20,000 元</td><td>部门负责人、财务负责人</td><td>附合同或报价单</td></tr><tr><td class="c">20,000 元以上</td><td>分管领导</td><td>附合同、预算批复</td></tr></table><p>第二十八条　【核销】借款应在事项结束后 15 个工作日内办理核销，核销时提交发票及附件冲抵借款；核销金额小于借款的，差额退回公司账户。</p><p>第二十九条　【未核销处理】借款逾期未核销的，财务部暂停该员工新借款与报销付款，并通知其部门负责人；逾期超过 30 个工作日的，从当月薪酬中扣回，扣回比例不超过当月应发工资的 20%，并留存书面记录。</p><h1 class="chapter" id="section-8">第八章　监督与违规处理</h1><p>第三十条　【日常监督】财务部按月汇总费用数据，形成费用分析报告；按季度组织报销抽查，抽查比例不低于当期单据量的 10%。</p><p>第三十一条　【审计】公司年度审计或专项审计覆盖报销业务，审计发现的问题由财务部跟踪整改。</p><p>第三十二条　【违规处理】违规情形与处理措施如下。</p><table class="doc"><tr><th>违规情形</th><th>处理措施</th></tr><tr><td class="c">凭证不合规、附件缺失</td><td>退回补正；累计 3 次纳入部门通报</td></tr><tr><td class="c">超标准报销</td><td>超出部分由个人承担；已付款的予以追回</td></tr><tr><td class="c">重复报销、拆分单据规避审批</td><td>追回款项、通报批评，按公司奖惩制度处理</td></tr><tr><td class="c">使用虚假发票、伪造凭证</td><td>全额追回并解除劳动关系；涉嫌违法的移送司法机关</td></tr><tr><td class="c">审批人越权审批、审核失职</td><td>按管理权限追究责任；造成损失的承担赔偿责任</td></tr></table><p>第三十三条　【举报与保护】员工可通过财务部或公司举报渠道反映违规报销行为。受理部门对举报人信息保密，举报属实的按规定给予奖励；打击报复举报人的，从严处理。</p><h1 class="chapter" id="section-9">第九章　附则</h1><p>第三十四条　【解释与修订】本制度由财务部负责解释。财务部根据法规变化与经营需要提出修订，报总经理批准后以新版本发布。</p><p>第三十五条　【生效与废止】本制度自 2026 年 12 月 1 日起施行，原《财务报销制度》（V1.0，2025 年 3 月发布）同时废止。本制度施行前已提交的报销单，按原制度执行。</p><p>第三十六条　【附件】本制度附件包括：</p><p>附件 1　费用报销单（平台电子表单）</p><p>附件 2　出差审批单</p><p>附件 3　业务招待申请单</p><p>附件 4　私车公用审批单</p><p>附件 5　借款单</p><p>附件 6　AI 初审报告样例</p><p class="plain" style="text-align:center;color:#6B6B6B;font-size:9.5pt;margin-top:24pt;">本文件为 AgentFlow 科技有限公司内部受控文件，未经书面许可不得复制、外传。</p></section>
+</body>
+</html>
