@@ -15,6 +15,9 @@ from app.utils.logger import logger
 from app.utils.task_ui import _build_expense_claim_list_payload
 from app.utils.time_parser import resolve_time_expression
 
+# 对话内默认每页条数：卡片一次展示 7 条，剩余的分页信息写进 answer
+DEFAULT_PAGE_SIZE = 7
+
 
 async def handle_expense_list(state: AgentState) -> dict[str, Any]:
     """查询当前登录用户的报销单列表。"""
@@ -101,14 +104,14 @@ async def handle_expense_list(state: AgentState) -> dict[str, Any]:
                 target_user_id = target_user.id
 
             requested_page = params.page or 1
-            page_size = params.page_size or 20
+            page_size = params.page_size or DEFAULT_PAGE_SIZE
 
             # 防止异常分页参数
             if requested_page < 1:
                 requested_page = 1
 
             if page_size < 1:
-                page_size = 20
+                page_size = DEFAULT_PAGE_SIZE
 
             # 4.1 第一次查询
             async def query_claims(page: int) -> dict[str, Any]:

@@ -332,6 +332,30 @@ class KnowledgeRepository:
         }
 
     # 根据子切片关联的父切片 ID 批量查询父切片
+    async def get_document_uid_map(
+        self,
+        document_ids: list[int],
+    ) -> dict[int, str]:
+        """批量获取文档 uid，供引用来源跳转到原文使用。
+
+        Args:
+            document_ids: 文档主键列表。
+
+        Returns:
+            {文档主键: 文档 uid} 映射，缺失的 id 不会出现在结果中。
+        """
+
+        ids = list(dict.fromkeys(document_ids))
+
+        if not ids:
+            return {}
+
+        stmt = select(Document.id, Document.uid).where(Document.id.in_(ids))
+
+        rows = await self.session.execute(stmt)
+
+        return {row[0]: row[1] for row in rows.all()}
+
     async def get_parent_chunks_by_ids(
         self,
         parent_ids: list[int],

@@ -54,7 +54,7 @@
       <!-- ===== 顶栏 ===== -->
       <header class="layout-header">
         <div class="header-left">
-          <!-- 移动端汉堡按钮 -->
+          <!-- 移动端主导航按钮 -->
           <el-icon class="hamburger" @click="drawerVisible = true"><Menu /></el-icon>
           <div class="logo-mini">
             <div class="logo-icon small">
@@ -98,7 +98,7 @@
       </header>
 
       <!-- ===== 主内容 ===== -->
-      <main class="layout-main" :class="{ 'no-padding': $route.path === '/ai-chat' }">
+      <main ref="mainRef" class="layout-main" :class="{ 'no-padding': $route.path === '/ai-chat' }">
         <router-view />
       </main>
     </div>
@@ -164,7 +164,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
@@ -181,6 +181,13 @@ const drawerVisible = ref(false)
 const logoutVisible = ref(false)
 const { t, locale } = useI18n()
 
+const mainRef = ref<HTMLElement>()
+// 路由切换时重置主内容滚动位置：layout-main 是全站共用的滚动容器，
+// 不重置的话，从列表页（已滚到底部）进入详情页会直接展示在页面底部
+watch(() => route.path, () => {
+  if (mainRef.value) mainRef.value.scrollTop = 0
+})
+
 // 切换语言：即时生效并持久化
 const switchLocale = (lang: string) => {
   locale.value = lang
@@ -191,14 +198,14 @@ const switchLocale = (lang: string) => {
 const roleLabel = computed(() => (userStore.userInfo?.role === 'admin' ? t('layout.roleAdmin') : t('layout.roleUser')))
 const avatarText = computed(() => (userStore.userInfo?.nickname || userStore.userInfo?.username || 'U').slice(0, 1))
 
-// 导航菜单：只保留已开发页面；知识库仅管理员可见
+// 导航菜单：只保留已开发页面；知识库对所有角色开放（页面内按 permission 控权）
 interface MenuItem { path: string; titleKey: string; icon: any; roles?: string[] }
 const menus: MenuItem[] = [
   { path: userStore.userInfo?.role === 'admin' ? '/dashboard/admin' : '/dashboard/employee', titleKey: 'nav.workbench', icon: Monitor },
   { path: '/my-claims', titleKey: 'nav.myClaims', icon: Tickets, roles: ['employee'] },
   { path: '/pending-approvals', titleKey: 'nav.pendingApprovals', icon: Stamp, roles: ['admin'] },
   { path: '/ai-chat', titleKey: 'nav.aiChat', icon: ChatDotRound },
-  { path: '/kb-manage', titleKey: 'nav.knowledge', icon: Notebook, roles: ['admin'] }
+  { path: '/kb-manage', titleKey: 'nav.knowledge', icon: Notebook }
 ]
 const visibleMenus = computed(() => {
   const role = userStore.userInfo?.role
@@ -208,6 +215,11 @@ const visibleMenus = computed(() => {
 const isActive = (path: string) => {
   if (path.startsWith('/dashboard')) return route.path.startsWith('/dashboard')
   if (path === '/kb-manage') return route.path.startsWith('/kb-manage')
+  // 报销双视图（待我审批 / 我的申请）：管理员从「待我审批」页 Tab 切到 /my-claims 时，
+  // 菜单仍归属报销入口保持高亮；员工访问 /my-claims 走下方普通相等判断。
+  if (path === '/pending-approvals' && userStore.userInfo?.role === 'admin') {
+    return route.path === '/pending-approvals' || route.path === '/my-claims'
+  }
   return route.path === path
 }
 
@@ -485,5 +497,10 @@ const onLogoutConfirm = () => {
   display: flex;
   flex-direction: column;
   background: #0d0d0d;
+}
+
+/* 主导航抽屉：teleport 到 body，scoped 样式够不到，用 :global 清掉默认内边距让内容撑满 */
+:global(.af-nav-drawer .el-drawer__body) {
+  padding: 0;
 }
 </style>

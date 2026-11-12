@@ -33,6 +33,17 @@ from app.utils.cache import get_document_cache
 from app.utils.datetime_helper import get_beijing_now_str
 from app.utils.logger import logger
 
+# 解析产物有效字符数低于该值时，认为 MinerU 没提出可用内容（空文档 / 扫描件 OCR 失败），
+# 预览回退到原文件，避免给用户展示一页残缺的 md。
+MIN_PARSED_MARKDOWN_CHARS = 100
+
+
+def _has_enough_text(markdown: str) -> bool:
+    """判断解析产物是否具备可预览的有效内容（忽略空白与 Markdown 标记）。"""
+    visible = re.sub(r"[\s#>*_`|~\-\[\]()]+", "", markdown)
+
+    return len(visible) >= MIN_PARSED_MARKDOWN_CHARS
+
 
 class KnowledgeService:
     """知识库及知识文档业务服务。"""
@@ -619,8 +630,8 @@ class KnowledgeService:
     ) -> dict:
         """返回文档预览内容，并按格式选择渲染方式。
 
-        - docx：服务端用 mammoth 转成 HTML（图片内联为 data URI），不依赖客户端装插件；
-        - pdf ：直接给出对象存储直链，由浏览器原生 PDF 阅读器渲染；
+        - docx：优先渲染 MinerU 产出的 Markdown，未解析完成时回退 mammoth 转 HTML；
+        - pdf ：优先渲染同一份 Markdown（与切片行号同源），解析缺失时回退原生 PDF；
         - md/txt：下发纯文本，前端用 marked 渲染；
         - 其他格式：返回 none，前端展示"暂不支持预览"并引导下载。
         """
@@ -633,8 +644,14 @@ class KnowledgeService:
         suffix = PurePosixPath(document.title or "").suffix.lower()
 
         if suffix == ".pdf":
+            # 预览必须与切片同源：切片的行号记的是 MinerU 产出的 md，只有渲染 md
+            # 用户才能顺着一句引用定位到原文。原 PDF 仍通过 source_url 提供下载/查看。
+            markdown = await self._read_parsed_markdown(document)
+            if markdown and _has_enough_text(markdown):
+                return {"kind": "markdown", "content": markdown}
+            # 尚未解析完成，或 OCR 几乎没提出内容（扫描件失败 / 空文档）：回退原生 PDF
             response = await self._document_response(document)
-            return {"kind": "pdf", "url": response.access_url}
+            return {"kind": "pdf", "url": response.source_url or response.access_url}
 
         if suffix in {".md", ".txt"}:
             content = await self._read_document_text(document)
@@ -676,7 +693,7 @@ class KnowledgeService:
             return None
 
     async def _read_parsed_markdown(self, document: Document) -> str | None:
-        """读取 docx 的解析产物 Markdown（worker 上传到对象存储，access_url 指向它）。"""
+        """读取解析产物 Markdown（worker 上传到对象存储，docx/pdf 的 access_url 指向它）。"""
         try:
             data = await self.minio_client.download(parsed_md_object_name(document.uid))
         except Exception:
@@ -986,7 +1003,7 @@ class KnowledgeService:
 
         response = DocumentResponse.model_validate(document)
         response.knowledge_base_uid = document.knowledge_base.uid
-        # 源文件直链：docx 的 access_url 已被替换为解析后的 md，下载源文件仍走 storage_path
+        # 源文件直链：docx/pdf 的 access_url 已被替换为解析后的 md，下载源文件仍走 storage_path
         response.source_url = (
             build_object_url(document.storage_path) if document.storage_path else None
         )

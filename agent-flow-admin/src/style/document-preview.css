@@ -35,13 +35,16 @@
 }
 
 /* ===== 标题导航（TOC）：吸顶在滚动容器左侧，右侧同宽占位保持纸张居中 ===== */
+/* max-height 必须对齐 .doc-viewer 的可视高度（100vh - 330px）：超出部分会被
+   #pane-preview 的 overflow:hidden 裁掉，底部条目看得见却点不到（点击被面板拦截）。
+   目录过长时由自身的 overflow:auto 内部滚动 */
 .doc-toc {
   flex: 0 0 200px;
   width: 200px;
   position: sticky;
   top: 0;
   align-self: flex-start;
-  max-height: calc(100vh - 220px);
+  max-height: calc(100vh - 336px);
   overflow: auto;
   padding: 6px 14px 6px 0;
   scrollbar-width: thin;

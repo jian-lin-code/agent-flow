@@ -1,5 +1,6 @@
 """知识库检索节点。"""
 
+import re
 from typing import Any
 
 from app.agent_graph.state import AgentState
@@ -10,6 +11,62 @@ from app.rag.retriever import KnowledgeRetriever
 from app.repository.knowledge_repository import KnowledgeRepository
 from app.services.retrieval_service import KnowledgeRetrievalService
 from app.utils.logger import logger
+
+# 引用定位锚点长度：取父切片正文开头这些字符，供前端在渲染后的文档中定位命中段落。
+ANCHOR_TEXT_LEN = 60
+# 锚点短于该长度时不做定位（信息量太低，容易误匹配），交给章节标题兜底。
+ANCHOR_MIN_CHARS = 8
+# 父块正文里的表格占位符（切分器写进去的，不是原文，不能当锚点）。
+_TABLE_PLACEHOLDER_PATTERN = re.compile(r"\[\[AF_TABLE_[a-fA-F0-9]+\]\]")
+# 父块正文里的表格占位说明（切分器写进去的，不是原文，不能当锚点）。
+_TABLE_NOTE_PATTERN = re.compile(r"\[表格内容已单独建立检索切片[^\]]*\]")
+# Markdown 标记：渲染后会被 HTML 标签吃掉，留在锚点里会导致前端匹配不上。
+_MARKDOWN_MARKS_PATTERN = re.compile(r"[#>*`~|]+")
+
+
+def _heading_path_of(chunk: Any) -> list[str]:
+    """从切片元数据中取出标题路径。
+
+    切分器对单标题切片写 ``heading_path``、对跨章节切片写 ``heading_paths``，
+    两种存法都要兼容，否则引用位置会退化成一个孤立行号。
+    """
+
+    extra_meta = getattr(chunk, "extra_meta", None)
+
+    if not isinstance(extra_meta, dict):
+        return []
+
+    path = extra_meta.get("heading_path")
+
+    if isinstance(path, list) and path:
+        return [str(item) for item in path]
+
+    paths = extra_meta.get("heading_paths")
+
+    if isinstance(paths, list) and paths and isinstance(paths[0], list):
+        return [str(item) for item in paths[0]]
+
+    return []
+
+
+def _anchor_text_of(chunk: Any) -> str:
+    """取切片正文开头的有效字符，作为前端定位原文的锚点。"""
+
+    content = (getattr(chunk, "content", "") or "").strip()
+
+    if not content:
+        return ""
+
+    # 去掉表格占位符与占位说明：它们不在正文里，留着会干扰前端匹配
+    content = _TABLE_PLACEHOLDER_PATTERN.sub(" ", content)
+    content = _TABLE_NOTE_PATTERN.sub(" ", content)
+    content = _MARKDOWN_MARKS_PATTERN.sub("", content)
+    content = re.sub(r"\s+", " ", content).strip()
+
+    if len(content) < ANCHOR_MIN_CHARS:
+        return ""
+
+    return content[:ANCHOR_TEXT_LEN]
 
 
 # 将检索上下文中的 ORM 对象转换为普通字典
@@ -49,6 +106,10 @@ def _serialize_knowledge_context(
         "parent_chunk_index": parent_chunk.chunk_index,
         "source_start_line": parent_chunk.source_start_line,
         "source_end_line": parent_chunk.source_end_line,
+
+        # 引用定位信息：章节路径用于展示位置，anchor_text 用于前端在正文中定位
+        "heading_path": _heading_path_of(parent_chunk),
+        "anchor_text": _anchor_text_of(parent_chunk),
 
         # 第一个命中的子切片，兼容原有数据结构
         "child_chunk_id": (
@@ -153,6 +214,18 @@ async def handle_knowledge_query(state: AgentState) -> dict[str, Any]:
                 serialized := _serialize_knowledge_context(context)
             )
         ]
+
+        # 补齐文档 uid：前端引用卡片跳转原文时用 uid 作为路由参数，内部 id 不外露
+        uid_map = await repository.get_document_uid_map(
+            [
+                context["document_id"]
+                for context in knowledge_contexts
+                if context.get("document_id") is not None
+            ]
+        )
+
+        for context in knowledge_contexts:
+            context["document_uid"] = uid_map.get(context.get("document_id"))
 
         candidate_count = result["candidate_count"]
         reranked_count = result["reranked_count"]

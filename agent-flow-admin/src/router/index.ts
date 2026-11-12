@@ -64,7 +64,8 @@ const routes = [
         path: 'my-claims',
         name: 'MyClaims',
         component: lazyPages.myClaims,
-        meta: { title: 'router.myClaims', roles: ['employee'] }
+        // 管理员也能发起报销，需查看自己的单据；入口在「待我审批」页内 Tab 切换，菜单不单列
+        meta: { title: 'router.myClaims', roles: ['employee', 'admin'] }
       },
       {
         path: 'pending-approvals',
@@ -73,22 +74,32 @@ const routes = [
         meta: { title: 'router.pendingApprovals', roles: ['admin'] }
       },
       {
+        // 知识库对所有登录角色开放：页面按钮均按后端返回的 permission（read/manage）
+        // 显隐，员工只能看到共享/自建/被授权的库；后端接口同样按权限二次校验。
         path: 'kb-manage',
         name: 'KnowledgeList',
         component: lazyPages.knowledgeList,
-        meta: { title: 'router.kbList', roles: ['admin'] }
+        meta: { title: 'router.kbList' }
       },
       {
         path: 'kb-manage/:kbId',
         name: 'KnowledgeDetail',
         component: lazyPages.knowledgeDetail,
-        meta: { title: 'router.kbDetail', roles: ['admin'] }
+        meta: { title: 'router.kbDetail' }
       },
       {
         path: 'kb-manage/:kbId/docs/:docId',
         name: 'KnowledgeDocument',
         component: lazyPages.knowledgeDocument,
-        meta: { title: 'router.docDetail', roles: ['admin'] }
+        meta: { title: 'router.docDetail' }
+      },
+      {
+        // 引用原文预览：从聊天引用卡片跳转进来，所有登录角色都可只读查看，
+        // 不挂 roles 限制；能否看到内容仍由后端按知识库权限二次校验。
+        path: 'citation/:kbId/docs/:docId',
+        name: 'CitationDocument',
+        component: lazyPages.knowledgeDocument,
+        meta: { title: 'router.docDetail' }
       }
     ]
   }

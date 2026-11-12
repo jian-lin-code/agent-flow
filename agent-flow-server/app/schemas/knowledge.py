@@ -126,7 +126,7 @@ class DocumentResponse(BaseModel):
     knowledge_base_uid: str | None = None
     title: str
     access_url:str | None = None
-    # 源文件直链（docx 的 access_url 会指向解析后的 md，下载原文件用这个）
+    # 源文件直链（docx/pdf 的 access_url 会指向解析后的 md，下载原文件用这个）
     source_url: str | None = None
     storage_path: str | None = None
     content_type: str | None = None

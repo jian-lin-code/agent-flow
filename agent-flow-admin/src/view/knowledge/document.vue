@@ -1,11 +1,18 @@
 <template>
   <div class="doc-page" v-if="doc">
     <div class="crumb">
-      <span class="link" @click="router.push('/kb-manage')">{{ $t('nav.knowledge') }}</span>
-      <el-icon><ArrowRight /></el-icon>
-      <span class="link" @click="router.push(`/kb-manage/${kb?.uid ?? doc.knowledge_base_uid}`)">{{ kb?.name || $t('nav.knowledge') }}</span>
-      <el-icon><ArrowRight /></el-icon>
-      <span class="current">{{ doc.title }}</span>
+      <template v-if="fromChat">
+        <span class="link" @click="backToSource">{{ $t('doc.backToChat') }}</span>
+        <el-icon><ArrowRight /></el-icon>
+        <span class="current">{{ $t('doc.citationTitle') }} · {{ doc.title }}</span>
+      </template>
+      <template v-else>
+        <span class="link" @click="router.push('/kb-manage')">{{ $t('nav.knowledge') }}</span>
+        <el-icon><ArrowRight /></el-icon>
+        <span class="link" @click="router.push(`/kb-manage/${kb?.uid ?? doc.knowledge_base_uid}`)">{{ kb?.name || $t('nav.knowledge') }}</span>
+        <el-icon><ArrowRight /></el-icon>
+        <span class="current">{{ doc.title }}</span>
+      </template>
     </div>
 
     <!-- 文档头卡 -->
@@ -39,6 +46,9 @@
         <button class="act-btn" @click="goPreview">
           <el-icon><View /></el-icon> {{ $t('doc.tabPreview') }}
         </button>
+        <button v-if="canViewOriginal" class="act-btn" @click="onViewOriginal">
+          <el-icon><Document /></el-icon> {{ $t('doc.viewSource') }}
+        </button>
         <button class="act-btn" @click="onDownload">
           <el-icon><Download /></el-icon> {{ $t('doc.downloadSource') }}
         </button>
@@ -60,7 +70,7 @@
         <div class="card tabs-card">
           <el-tabs v-model="activeTab">
             <el-tab-pane :label="$t('doc.tabPreview')" name="preview">
-              <!-- PDF：浏览器原生预览 -->
+              <!-- PDF：解析完成前 / OCR 失败时回退浏览器原生预览 -->
               <div v-if="previewKind === 'pdf'" class="pdf-viewer">
                 <iframe :src="fileUrl || ''" class="pdf-frame" frameborder="0" />
               </div>
@@ -124,7 +134,7 @@
               </div>
             </el-tab-pane>
 
-            <el-tab-pane :label="$t('doc.tabInfo')" name="info">
+            <el-tab-pane v-if="!fromChat" :label="$t('doc.tabInfo')" name="info">
               <el-descriptions :column="2" border>
                 <el-descriptions-item :label="$t('doc.metaName')">{{ doc.title }}</el-descriptions-item>
                 <el-descriptions-item :label="$t('doc.metaType')">{{ typeLabel }}</el-descriptions-item>
@@ -138,7 +148,7 @@
               </el-descriptions>
             </el-tab-pane>
 
-            <el-tab-pane :label="$t('doc.tabProcess')" name="process">
+            <el-tab-pane v-if="!fromChat" :label="$t('doc.tabProcess')" name="process">
               <div class="process-panel">
                 <!-- 智能处理流水线 -->
                 <div class="pipeline">
@@ -234,7 +244,7 @@
               </div>
             </el-tab-pane>
 
-            <el-tab-pane :label="$t('doc.tabChunks')" name="chunks">
+            <el-tab-pane v-if="!fromChat" :label="$t('doc.tabChunks')" name="chunks">
               <div v-if="chunksLoading" class="md-tip"><el-skeleton :rows="6" animated /></div>
               <el-empty v-else-if="chunks.length === 0" :description="$t('doc.chunksEmpty')" />
               <div v-else class="chunk-list">
@@ -331,7 +341,9 @@
   </div>
   <div v-else-if="loadError" class="doc-page">
     <el-empty :description="loadError">
-      <el-button type="primary" @click="router.push('/kb-manage')">{{ $t('doc.backToKb') }}</el-button>
+      <el-button type="primary" @click="fromChat ? backToSource() : router.push('/kb-manage')">
+        {{ fromChat ? $t('doc.backToChat') : $t('doc.backToKb') }}
+      </el-button>
     </el-empty>
   </div>
   <div v-else class="doc-page">
@@ -348,13 +360,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { renderMarkdown } from '@/utils/markdown'
 import {
-  ArrowRight, Download, View, MoreFilled,
+  ArrowRight, Download, View, MoreFilled, Document,
   Collection, RefreshRight, Delete, Connection, Loading, Monitor,
   CircleCheckFilled, CircleCloseFilled, Check, Close, CopyDocument
 } from '@element-plus/icons-vue'
@@ -368,6 +380,9 @@ import DeleteDocDialog from './DeleteDocDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
+/** 从聊天引用卡片跳转进来：走只读预览模式，隐藏知识库管理导航 */
+const fromChat = computed(() => route.name === 'CitationDocument')
+const backToSource = () => router.push('/ai-chat')
 const { t, locale } = useI18n()
 
 const doc = ref<DocumentDto | null>(null)
@@ -399,10 +414,12 @@ const typeLabel = computed(() => {
   return ext.value ? ext.value.toUpperCase() : t('doc.unknown')
 })
 const previewKind = computed<'pdf' | 'md' | 'docx' | 'unsupported'>(() => {
+  // 解析完成后 docx/pdf 的 access_url 指向 MinerU 生成的 md，直接按 Markdown 渲染。
+  // 预览必须与切片同源（切片的行号就是这份 md 的行号），引用才能定位到原文。
+  if (['docx', 'pdf'].includes(ext.value) && extOf(doc.value?.access_url || '') === 'md') return 'md'
+  // 未解析完成，或 OCR 没提出内容：PDF 回退浏览器原生渲染
   if (ext.value === 'pdf') return 'pdf'
   if (ext.value === 'md') return 'md'
-  // docx 解析完成后 access_url 指向 MinerU 生成的 md，直接按 Markdown 渲染
-  if (ext.value === 'docx' && extOf(doc.value?.access_url || '') === 'md') return 'md'
   // .doc 是老式二进制格式，服务端 mammoth 解析不了，仍走"不支持预览 + 下载"
   if (ext.value === 'docx') return 'docx'
   return 'unsupported'
@@ -686,9 +703,9 @@ const connectProgress = () => {
     if (event.status === 'indexed') {
       void loadChunks()
       ElMessage.success(t('doc.indexedDone'))
-      // 解析阶段后端可能已把 access_url 改写为 Markdown 预览地址（docx），
-      // 页面在上传时就打开的话本地还留着旧的 docx 直链，必须重新拉取一次，
-      // 否则预览会一直停留在 Word 转 HTML 的渲染分支
+      // 解析阶段后端可能已把 access_url 改写为 Markdown 预览地址（docx/pdf），
+      // 页面在上传时就打开的话本地还留着旧的直链，必须重新拉取一次，
+      // 否则预览会一直停留在旧分支（Word 转 HTML / 原生 PDF）
       void getDocument(doc.value.uid)
         .then((fresh) => {
           doc.value = fresh.data
@@ -711,7 +728,7 @@ const connectProgress = () => {
         try {
           const res = await getDocument(doc.value.uid)
           doc.value = res.data
-          // 兜底刷新：状态已落定时 access_url 可能已被后端改写（docx → md），重载预览
+          // 兜底刷新：状态已落定时 access_url 可能已被后端改写（docx/pdf → md），重载预览
           loadPreview()
         } catch { /* 刷新失败时保持现状 */ }
       }
@@ -821,8 +838,43 @@ const jumpToHeading = (id: string) => {
   container.scrollTo({ top, behavior: 'smooth' })
 }
 
+/** 引用定位只执行一次：进入页面定位后，用户自行滚动不再被拉回 */
+let anchorLocated = false
+
+/**
+ * 从引用卡片跳转过来时，定位到命中段落。
+ *
+ * 优先用锚点文本（父切片正文开头）在块级元素里匹配，失败再退到章节标题，
+ * 都失败就停在文首 —— 定位失败不影响阅读，但不能把页面滚动搞乱。
+ */
+const locateFromQuery = () => {
+  if (anchorLocated) return
+  const container = paperScrollRef.value
+  const queryAnchor = String(route.query.anchor || '').trim()
+  const queryLoc = String(route.query.loc || '').trim()
+  if (!container || (!queryAnchor && !queryLoc)) return
+  anchorLocated = true
+
+  const norm = (value: string) => value.replace(/\s+/g, '')
+  const blocks = Array.from(
+    container.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6,p,li,tr,blockquote'),
+  )
+  // 锚点尾部可能被截断，取前 24 字做探测串：足够独特，又不会因截断错过命中段落
+  const probe = norm(queryAnchor).slice(0, 24)
+  const hit = (probe && blocks.find((el) => norm(el.textContent || '').includes(probe)))
+    || blocks.find((el) => /^H[1-6]$/.test(el.tagName) && norm(el.textContent || '') === norm(queryLoc))
+    || null
+
+  if (!hit) return
+
+  const top = hit.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 16
+  container.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' })
+  hit.classList.add('anchor-hit')
+  window.setTimeout(() => hit.classList.remove('anchor-hit'), 3200)
+}
+
 // 预览 HTML 更新（新文档加载 / md 解析完成 / docx 转换完成）后重建目录
-watch([mdHtml, docxHtml], () => { void buildToc() })
+watch([mdHtml, docxHtml], () => { void buildToc().then(locateFromQuery) })
 
 
 const loadMarkdown = async () => {
@@ -876,7 +928,7 @@ const loadDocx = async () => {
   }
 }
 
-/** 按文件类型分派预览加载器（PDF 交给浏览器原生渲染，无需请求） */
+/** 按文件类型分派预览加载器（PDF 只有在解析产物缺失时才回退浏览器原生渲染，无需请求） */
 const loadPreview = () => {
   if (previewKind.value === 'md') void loadMarkdown()
   else if (previewKind.value === 'docx') void loadDocx()
@@ -884,6 +936,8 @@ const loadPreview = () => {
 
 const load = async () => {
   loadError.value = ''
+  // 切换文档后允许重新定位（同一会话里可能从不同引用跳过来）
+  anchorLocated = false
   doc.value = null
   kb.value = null
   chunks.value = []
@@ -902,7 +956,7 @@ const load = async () => {
     // 阶段与日志直接来自文档接口响应，先渲染，不依赖后续任何慢请求
     applyStageRecords(data.stage_records)
     seedLogs(data.process_logs)
-    if (isProcessing.value) {
+    if (isProcessing.value && !fromChat.value) {
       // 上传后跳转进来时，处理中的文档默认展示"处理记录"并建立 SSE 实时进度连接
       activeTab.value = 'process'
       connectProgress()
@@ -910,7 +964,8 @@ const load = async () => {
     const kbResponse = await getKnowledgeBase(data.knowledge_base_uid || '')
     kb.value = kbResponse.data
     // chunk_count 可能不下发，直接尝试加载分块（无分块时接口返回空数组）
-    void loadChunks()
+    // 引用预览模式下不展示分块 Tab，省掉这次请求
+    if (!fromChat.value) void loadChunks()
     // 预览可能因对象存储跨域/转换耗时变慢，非阻塞加载，不拖慢主信息渲染
     loadPreview()
   } catch (error) {
@@ -925,13 +980,34 @@ watch(() => route.params.docId, () => {
 })
 void load()
 
+// 进入详情页回到顶部：layout-main 是全站共用的滚动容器，从列表页滚到底部
+// 点进来会继承滚动位置，页面一打开就在底部。带 anchor/loc 参数（引用跳转）
+// 时不重置，滚动定位交给 locateFromQuery。
+onMounted(async () => {
+  if (route.query.anchor || route.query.loc) return
+  await nextTick()
+  const container = document.querySelector('.layout-main')
+  if (container) container.scrollTop = 0
+})
+
 const goPreview = () => {
   activeTab.value = 'preview'
   loadPreview()
 }
 
+/** 预览渲染的是解析后的 md 时，仍保留「查看原件」入口（业务上可能要看红章、签字） */
+const canViewOriginal = computed(() => ['pdf', 'docx'].includes(ext.value) && !!doc.value?.source_url)
+const onViewOriginal = () => {
+  const target = doc.value?.source_url
+  if (!target) {
+    ElMessage.warning(t('doc.noDownloadable'))
+    return
+  }
+  window.open(target, '_blank', 'noopener')
+}
+
 const onDownload = () => {
-  // 下载源文件：docx 的 access_url 已指向解析后的 md，这里优先用源文件直链
+  // 下载源文件：docx/pdf 的 access_url 已指向解析后的 md，这里优先用源文件直链
   const target = doc.value?.source_url || fileUrl.value
   if (!target) {
     ElMessage.warning(t('doc.noDownloadable'))
@@ -1072,6 +1148,17 @@ watch(locale, () => {
 .md-tip { width: 100%; padding: 12px; }
 /* Word 转出来的 HTML 结构更扁平，补一点段落间距，读起来更像原文 */
 .doc-markdown.docx-plain > p { margin: 0 0 10px; }
+
+/* 引用定位高亮：v-html 生成的节点不带 scope 属性，必须走 :deep 才能命中 */
+.doc-viewer :deep(.anchor-hit) {
+  border-radius: 4px;
+  animation: anchor-flash 3.2s ease-out;
+}
+@keyframes anchor-flash {
+  0% { background-color: var(--el-color-warning-light-5); box-shadow: 0 0 0 4px var(--el-color-warning-light-7); }
+  70% { background-color: var(--el-color-warning-light-5); }
+  100% { background-color: transparent; box-shadow: none; }
+}
 
 
 /* ===== 分块 ===== */

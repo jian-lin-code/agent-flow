@@ -5,12 +5,14 @@ from typing import Dict, Any
 from app.core.exceptions import FileProcessingError
 from app.events.document_progress import emit
 from app.utils.logger import logger
+from app.rag.cleaner import get_document_cleaner
 from app.rag.parsers.mineru_engine import get_mineru_service
 
 
 class DocumentParser:
     def __init__(self):
         self.mineru_service = get_mineru_service()
+        self.cleaner = get_document_cleaner()
 
     @staticmethod
     def _decode_text(file_bytes: bytes) -> str:
@@ -87,6 +89,58 @@ class DocumentParser:
 
         logger.info("[Parser][DOC-%s] 文档解析成功，提取内容共 %d 个字符", document_uid, len(content))
 
+        # 解析与切分之间的清洗：统一字符、还原 HTML 结构、去除版式噪声。
+        # 纯文本只做字符与空白归一，避免误伤 txt 正文。
+        is_markdown = suffix in {".md", ".pdf", ".docx"}
+
+        await emit(
+            f"正在清洗文本 · {'Markdown' if is_markdown else '纯文本'}模式",
+            ctx=ctx,
+        )
+
+        content, clean_stats = self.cleaner.clean(
+            content,
+            is_markdown=is_markdown,
+        )
+
+        if clean_stats.hits:
+            logger.info(
+                "[Parser][DOC-%s] 文档清洗完成：%s",
+                document_uid,
+                clean_stats.summary(),
+            )
+        else:
+            logger.info(
+                "[Parser][DOC-%s] 文档清洗完成：%d → %d 字符，未命中任何清洗规则",
+                document_uid,
+                clean_stats.original_chars,
+                clean_stats.cleaned_chars,
+            )
+
+        await emit(
+            f"文本清洗完成 · {clean_stats.summary()}",
+            ctx=ctx,
+        )
+
+        if clean_stats.rollback:
+            logger.warning(
+                "[Parser][DOC-%s] 结构性清洗删除过多内容，已回滚到字符归一 + HTML 结构化结果",
+                document_uid,
+            )
+
+            await emit(
+                "文本清洗触发内容保护，已回滚结构性清洗，请检查文档格式",
+                ctx=ctx,
+                level="warn",
+            )
+
+        if not content or not content.strip():
+            logger.error("[Parser][DOC-%s] 清洗后内容为空: %s", document_uid, filename)
+            await emit(
+                "清洗失败：清洗后文档内容为空",
+                ctx=ctx,
+            )
+            raise FileProcessingError(f"清洗后文档内容为空: {filename}")
 
         return {
             "content": content,

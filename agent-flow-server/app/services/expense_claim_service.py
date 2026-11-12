@@ -187,7 +187,7 @@ class ExpenseClaimService:
         date_to: date | datetime | None = None,
         expense_category: str | None = None,
         page: int = 1,
-        page_size: int = 20,
+        page_size: int = 7,
     ) -> dict:
         """分页查询当前用户的报销单列表（连表最新预审）。
 

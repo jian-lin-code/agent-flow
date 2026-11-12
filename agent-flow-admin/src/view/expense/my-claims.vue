@@ -9,6 +9,7 @@
         </div>
         <p class="hero-sub">{{ $t('claims.employee.sub') }}</p>
       </div>
+      <ClaimViewSwitch v-if="isAdmin" class="hero-switch" />
       <button class="hero-cta" @click="router.push('/ai-chat')">
         <el-icon><ChatDotRound /></el-icon> {{ $t('claims.employee.goChat') }}
       </button>
@@ -213,6 +214,8 @@ import {
 } from '@element-plus/icons-vue'
 import PreReviewDrawer from './PreReviewDrawer.vue'
 import TableSwipe from '@/components/TableSwipe.vue'
+import ClaimViewSwitch from './ClaimViewSwitch.vue'
+import { useUserStore } from '@/stores/user'
 import { copyWithToast } from '@/utils/clipboard'
 import {
   exportClaimsCsv,
@@ -225,6 +228,9 @@ import {
 
 const router = useRouter()
 const { t } = useI18n()
+const userStore = useUserStore()
+/** 仅管理员展示「待我审批 / 我的申请」切换（员工无待审批入口） */
+const isAdmin = computed(() => userStore.userInfo?.role === 'admin')
 
 const stats = ref<ClaimStats | null>(null)
 const statsLoading = ref(false)
@@ -405,6 +411,8 @@ const resultClass = (r: string | null) =>
 .hero-title-row h1 { color: var(--af-text); font-size: 24px; font-weight: 700; letter-spacing: -0.3px; }
 .hero-tag { color: var(--af-primary); font-size: 12px; background: rgba(255, 92, 51, 0.15); border: 1px solid rgba(255, 92, 51, 0.25); border-radius: 6px; padding: 3px 10px; font-weight: 500; }
 .hero-sub { color: var(--af-text-3); font-size: 13px; margin-top: 8px; }
+/* 视图切换在 hero 中垂直居中，窄屏时整行铺满 */
+.hero-switch { align-self: center; }
 .hero-cta {
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--af-primary-gradient);
@@ -567,13 +575,12 @@ const resultClass = (r: string | null) =>
 @media (max-width: 768px) {
   .hero-title-row h1 { font-size: 21px; }
   .hero-cta { width: 100%; justify-content: center; }
-  /* 分页收窄：隐藏每页条数与总数，居中显示，避免撑破容器 */
+  .hero-switch { width: 100%; justify-content: center; }
+  /* 分页收窄：隐藏每页条数与总数，居中显示，避免撑破容器。
+     不再做 sticky 吸底：吸底时悬浮条会盖住表格最后一行，
+     滚动到底的露出已由 MainLayout 的 ::after 底部占位块保证。 */
   .table-pagination {
     justify-content: center;
-    /* iOS Safari 分页曾被压到工具栏后面：吸底常驻，始终可点 */
-    position: sticky;
-    bottom: calc(62px + env(safe-area-inset-bottom));
-    z-index: 5;
     background: var(--af-card, #141414);
   }
   .table-pagination :deep(.el-pagination__total),

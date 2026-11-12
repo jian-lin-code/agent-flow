@@ -9,6 +9,7 @@
         </div>
         <p class="hero-sub">{{ $t('claims.admin.sub') }}</p>
       </div>
+      <ClaimViewSwitch class="hero-switch" />
       <button class="hero-cta" :disabled="listLoading" @click="loadClaims">
         <el-icon><Refresh /></el-icon> {{ $t('claims.admin.refresh') }}
       </button>
@@ -276,6 +277,7 @@ import {
 } from '@element-plus/icons-vue'
 import PreReviewDrawer from './PreReviewDrawer.vue'
 import DecideDialog from './DecideDialog.vue'
+import ClaimViewSwitch from './ClaimViewSwitch.vue'
 import TableSwipe from '@/components/TableSwipe.vue'
 import { copyWithToast } from '@/utils/clipboard'
 import {
@@ -523,6 +525,8 @@ const openAttachment = (a: ClaimAttachment) => {
 .hero-title-row h1 { color: var(--af-text); font-size: 24px; font-weight: 700; letter-spacing: -0.3px; }
 .hero-tag { color: var(--af-primary); font-size: 12px; background: rgba(255, 92, 51, 0.15); border: 1px solid rgba(255, 92, 51, 0.25); border-radius: 6px; padding: 3px 10px; font-weight: 500; }
 .hero-sub { color: var(--af-text-3); font-size: 13px; margin-top: 8px; }
+/* 视图切换在 hero 中垂直居中，窄屏时整行铺满 */
+.hero-switch { align-self: center; }
 .hero-cta {
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--af-primary-gradient);
@@ -728,18 +732,18 @@ const openAttachment = (a: ClaimAttachment) => {
 @media (max-width: 768px) {
   .hero-title-row h1 { font-size: 21px; }
   .hero-cta { width: 100%; justify-content: center; }
+  .hero-switch { width: 100%; justify-content: center; }
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .search-bar { flex-direction: row; }
   .search-input { flex: 1; min-width: 0; }
   .search-date { width: 100%; flex: 1 1 100%; }
   .bar-actions { flex: 1; margin-left: 0; }
   .bar-actions .el-button { flex: 1; }
-  /* 分页收窄 + 吸底常驻（iOS Safari 下不会被工具栏遮挡） */
+  /* 分页收窄：隐藏每页条数与总数，居中显示，避免撑破容器。
+     不再做 sticky 吸底：吸底时悬浮条会盖住表格最后一行，
+     滚动到底的露出已由 MainLayout 的 ::after 底部占位块保证。 */
   .table-pagination {
     justify-content: center;
-    position: sticky;
-    bottom: calc(62px + env(safe-area-inset-bottom));
-    z-index: 5;
     background: var(--af-card, #161616);
   }
   .table-pagination :deep(.el-pagination__total),

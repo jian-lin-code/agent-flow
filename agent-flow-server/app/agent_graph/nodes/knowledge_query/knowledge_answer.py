@@ -54,6 +54,11 @@ def _build_knowledge_contexts(
             "source_end_line": end_line,
             "document_id": context.get("document_id"),
             "parent_chunk_id": context.get("parent_chunk_id"),
+            # 引用定位：前端据此跳转到文档预览并滚动到命中段落
+            "document_uid": context.get("document_uid"),
+            "knowledge_base_uid": context.get("knowledge_base_uid"),
+            "heading_path": context.get("heading_path") or [],
+            "anchor_text": context.get("anchor_text") or "",
         }
 
         sources.append(source)

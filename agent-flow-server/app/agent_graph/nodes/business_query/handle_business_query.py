@@ -2,7 +2,6 @@
 
 import re
 from typing import Any
-from unittest import result
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -80,7 +79,8 @@ def _get_pagination_page(
         return current_page + 1
 
     if "上一页" in message or "上一张" in message:
-        return max(1, current_page - 1)
+        # 不做下限截断：第 1 页时返回 0，由调用方给出「已是第一页」提示
+        return current_page - 1
 
     # 阿拉伯数字页码
     match = re.fullmatch(
@@ -241,8 +241,22 @@ async def handle_business_query(
 
         # 用户在第一页请求上一页
         if target_page < 1:
+            answer = "当前已经是第一页了，没有更早的报销记录。"
+
+            prev_total_pages = previous_query.get("total_pages")
+
+            if (
+                isinstance(prev_total_pages, int)
+                and not isinstance(prev_total_pages, bool)
+                and prev_total_pages > 0
+            ):
+                answer += (
+                    f"当前查询共有 {prev_total_pages} 页，"
+                    "你可以对我说「下一页」查看后面的内容。"
+                )
+
             return {
-                "answer": "当前已经是第一页了，没有更早的报销记录。"
+                "answer": answer
             }
 
         # 2. 校验分页边界
@@ -290,7 +304,7 @@ async def handle_business_query(
 
     messages = [
         SystemMessage(content=system_prompt),
-        *build_history_messages(state.get("history") or [], 4),
+        *build_history_messages(state.get("history") or [], max_messages=4,),
         HumanMessage(content=current_message),
     ]
 

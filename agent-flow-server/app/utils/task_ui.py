@@ -329,8 +329,18 @@ def _build_knowledge_sources_payload(
         start_line = source.get("source_start_line")
         end_line = source.get("source_end_line")
 
-        # 后端直接算好位置描述的字符串，前端不需要写复杂的 if-else
-        if start_line is not None and end_line is not None:
+        # 位置优先展示所属小节标题：行号是解析产物 md 的行号，用户在 PDF 里找不到，
+        # 只有纯文本文档（没有标题结构）才退回行号兜底。
+        heading_path = source.get("heading_path") or []
+        section_title = (
+            str(heading_path[-1]).strip()
+            if isinstance(heading_path, list) and len(heading_path) >= 2
+            else ""
+        )
+
+        if section_title:
+            location = section_title
+        elif start_line is not None and end_line is not None:
             location = f"第 {start_line}-{end_line} 行"
         elif start_line is not None:
             location = f"第 {start_line} 行"
@@ -342,6 +352,12 @@ def _build_knowledge_sources_payload(
             "document_title": source.get("document_title") or "未知文档",
             "knowledge_base_name": source.get("knowledge_base_name") or "未知知识库",
             "location": location,
+            # 以下字段供前端「点击引用 → 打开原文 → 定位到命中段落」
+            "document_uid": source.get("document_uid"),
+            "knowledge_base_uid": source.get("knowledge_base_uid"),
+            "anchor_text": source.get("anchor_text") or "",
+            "source_start_line": start_line,
+            "source_end_line": end_line,
         })
 
     return {

@@ -104,13 +104,13 @@ class KnowledgeRetrievalService:
 
         filtered_count = len(filtered_candidates)
 
-        logger.info(
-            "知识库相关性过滤完成："
-            f"threshold={min_rerank_score}, "
-            f"reranked_count={len(reranked_candidates)}, "
-            f"filtered_count={filtered_count}, "
-            f"rejected_count={len(reranked_candidates) - filtered_count}"
-        )
+        # logger.info(
+        #     "知识库相关性过滤完成："
+        #     f"threshold={min_rerank_score}, "
+        #     f"reranked_count={len(reranked_candidates)}, "
+        #     f"filtered_count={filtered_count}, "
+        #     f"rejected_count={len(reranked_candidates) - filtered_count}"
+        # )
 
         # 第三步：根据重排序结果获取父切片并构建上下文
         contexts = await self.context_builder.build(

@@ -2,14 +2,11 @@
 """报销信息补充节点。"""
 
 import json
-from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
-from zoneinfo import ZoneInfo
-
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage, AIMessage
 from pydantic import ValidationError
-
+from app.agent_graph.history import build_history_messages
 from app.agent_graph.prompt_manager import render_prompt
 from app.agent_graph.schemas.expense_extraction import ExpenseExtractionResult
 from app.agent_graph.state import AgentState
@@ -28,6 +25,26 @@ from app.utils.task_ui import _build_task_ui_payload
 # 注入 prompt 的已有明细字段，避免上下文过长。
 EXISTING_ITEM_FIELDS = ("id", "category", "amount", "expense_date")
 MAX_EXISTING_ITEMS = 10
+
+
+def format_history_to_text(messages: list[BaseMessage]) -> str:
+    """
+    将 LangChain 消息列表转换为纯文本格式，方便塞入 Prompt。
+    """
+    if not messages:
+        return "无历史对话记录。"
+
+    formatted_lines = []
+    for msg in messages:
+        if isinstance(msg, HumanMessage):
+            formatted_lines.append(f"用户: {msg.content}")
+        elif isinstance(msg, AIMessage):
+            # 如果历史消息是上一轮 AI 输出的 JSON，也可以加个前缀标明
+            formatted_lines.append(f"助手: {msg.content}")
+
+    return "\n".join(formatted_lines)
+
+
 def _collect_existing_expense_items(state: AgentState) -> list[dict[str, Any]]:
     """取出当前活动任务的已有费用明细，仅保留匹配 update 所需的字段。"""
     active_task_uid = state.get("active_business_task_uid")
@@ -156,6 +173,7 @@ async def handle_provide_information(
         current_date=get_beijing_now_str(),
         existing_items_json=json.dumps(existing_items, ensure_ascii=False, indent=2),
         allow_update=bool(existing_items),
+        history=format_history_to_text(build_history_messages(state.get("history") or [], max_messages=4,)),
         current_message=current_message
     )
     # 标准模型路径：保留 with_structured_output

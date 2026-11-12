@@ -113,7 +113,7 @@ class ExpenseClaimRepository:
             date_to: datetime | None = None,
             expense_category: str | None = None,
             page: int = 1,
-            page_size: int = 20,
+            page_size: int = 7,
     ) -> tuple[list[tuple[ExpenseClaim, ExpensePreReview | None]], int]:
         """
         分页查询指定申请人的报销单，并关联每张单据最新的 AI 预审记录。

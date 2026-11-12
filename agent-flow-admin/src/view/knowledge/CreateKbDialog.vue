@@ -192,7 +192,7 @@
           </div>
         </div>
 
-        <!-- 治理开关（后端暂未支持，置灰占位） -->
+        <!-- 治理开关：鉴权审计已上线（平台级强制开启）；动态水印暂未支持，置灰占位 -->
         <div class="ck-toggle-grid">
           <div class="ck-toggle">
             <div class="ck-toggle-left">
@@ -203,8 +203,8 @@
               </div>
             </div>
             <div class="ck-toggle-right">
-              <span class="ck-soon">{{ $t('kb.ckComingSoon') }}</span>
-              <el-switch disabled />
+              <span class="ck-soon ck-live">{{ $t('kb.ckLaunched') }}</span>
+              <el-switch :model-value="true" disabled />
             </div>
           </div>
           <div class="ck-toggle">
@@ -744,6 +744,11 @@ const submit = async () => {
   border: 1px solid var(--af-border);
   border-radius: 5px;
   padding: 1px 5px;
+}
+/* 已上线徽标：绿色描边 */
+.ck-live {
+  color: var(--af-success);
+  border-color: rgba(46, 204, 113, 0.35);
 }
 
 /* RAG 管线信息 */

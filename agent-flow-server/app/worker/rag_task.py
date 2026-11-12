@@ -161,10 +161,15 @@ async def process_document(ctx: dict, document_id: int) -> None:
             content = parse_result.get("content", "") or ""
             mark_stage("parsing")
 
-            # Word 文档：MinerU 已产出 Markdown，把 md 落一份到对象存储并把 access_url 指向它。
+            # Word / PDF：MinerU 已产出 Markdown，把 md 落一份到对象存储并把 access_url 指向它。
             # 前端预览直接渲染 md（与 AI 回答同款样式），比 mammoth 转 HTML 更还原、排版更稳。
+            #
+            # 关键约束：切片的 source_start_line / source_end_line 记的就是这份 md 的行号，
+            # 预览必须与切分同源，引用才能定位到原文。因此这里上传的 content 与下面交给
+            # chunker 的必须是同一份文本 —— 切勿为了「保留原始排版」改成上传清洗前的版本，
+            # 否则行号会与预览全线错位。
             suffix = Path(document.title or "").suffix.lower()
-            if suffix == ".docx" and content.strip():
+            if suffix in {".docx", ".pdf"} and content.strip():
                 try:
                     md_object = parsed_md_object_name(document.uid)
                     md_bytes = content.encode("utf-8")
@@ -178,10 +183,10 @@ async def process_document(ctx: dict, document_id: int) -> None:
                         level="success",
                     )
                 except Exception as exc:
-                    # 上传失败不影响后续切块/索引，预览会回退为服务端 Word 转 HTML
+                    # 上传失败不影响后续切块/索引，预览会回退为原文件（Word 转 HTML / 原生 PDF）
                     logger.warning("[Worker] Markdown 预览文件上传失败 %s: %s", document.uid, exc)
                     await log(
-                        "Markdown 预览文件上传失败，预览将回退为 Word 转换",
+                        "Markdown 预览文件上传失败，预览将回退为原文件",
                         stage=DocumentStatus.PARSING.value,
                         progress=96,
                         level="warn",

@@ -127,6 +127,10 @@ class AdvancedMarkdownChunker:
         r"\[\[AF_TABLE_[a-fA-F0-9]+\]\]"
     )
 
+    # 首个标题之前的前置段最大字符数。
+    # 小于该值视为封面/文件控制信息，并入首个章节；超过则视为正文，独立成节。
+    PREFACE_MAX_CHARS = 100
+
     def __init__(
         self,
         *,
@@ -319,28 +323,24 @@ class AdvancedMarkdownChunker:
         return str(uuid.uuid4())
 
     @staticmethod
-    def _normalize_newlines(text: str) -> str:
+    def _compact_blank_lines(text: str) -> str:
         """
-        统一文本换行符。
+        压缩切片正文中的连续空行。
+
+        表格被替换为占位符后，原表格每一行都会留下一个空行，
+        直接入库会在正文里形成成片换行，既浪费字符也稀释向量语义。
 
         Args:
-            text: 原始文档文本。
+            text: 切片正文。
 
         Returns:
-            将 \\r\\n 和 \\r 统一转换为 \\n 的文本。
+            连续 3 个以上换行压缩为 2 个（保留一个空行）后的正文。
         """
-        return text.replace("\r\n", "\n").replace("\r", "\n")
 
-    @staticmethod
-    def _remove_empty_html_anchors(text: str) -> str:
-        """移除空的 HTML 锚点，保留换行结构。"""
+        compacted = re.sub(r"\n{3,}", "\n\n", text)
 
-        return re.sub(
-            r'<a\b[^>]*\bid\s*=\s*["\']?[^"\'>\s]+["\']?[^>]*>\s*</a>',
-            '',
-            text,
-            flags=re.IGNORECASE,
-        )
+        return re.sub(r"[ \t]+\n", "\n", compacted).strip()
+
     @staticmethod
     def _make_chunk(
         *,
@@ -377,7 +377,9 @@ class AdvancedMarkdownChunker:
             "document_uid": document_uid,
             "parent_id": parent_id,
             "is_parent": is_parent,
-            "content": content.strip(),
+            # 表格提取时被替换的行会留下空行占位，
+            # 这里压掉连续空行，避免成片换行进入向量化文本。
+            "content": AdvancedMarkdownChunker._compact_blank_lines(content),
             "chunk_index": chunk_index,
             "metadata": metadata,
             "embedding": None,
@@ -688,6 +690,62 @@ class AdvancedMarkdownChunker:
             flush(len(lines))
 
         return sections
+
+    # ========================================================
+    # 文档前置段处理
+    # ========================================================
+
+    @classmethod
+    def _merge_document_preface(
+        cls,
+        sections: list[TextSection],
+    ) -> tuple[list[TextSection], str | None]:
+        """
+        把文档首个标题之前的短前置段并入第一个章节。
+
+        背景：
+            PDF/Word 的封面信息（公司名、文件编号、版本、密级、受控声明）
+            位于首个标题之前，不属于任何章节。长度很短时若单独成节，
+            会产出一个只含「XX 有限公司」的噪声父块，占用切片位并稀释检索结果。
+
+        处理规则：
+            1. 只处理第一个 Section，且它必须没有标题路径。
+            2. 第二个 Section 必须是带标题的章节，否则说明整篇没有结构，不做处理。
+            3. 前置段长度必须小于 PREFACE_MAX_CHARS，超过则视为正文，独立成节。
+            4. 合并后内容不丢失，作为首个章节正文的前缀；
+               起始行号取前置段的起始行，保证 source 范围完整。
+
+        Args:
+            sections: 按原文顺序排列的章节列表。
+
+        Returns:
+            (处理后的章节列表, 被合并的前置段文本或 None)。
+        """
+
+        if len(sections) < 2:
+            return sections, None
+
+        first = sections[0]
+
+        # 首节本身带标题，说明文档没有前置段。
+        if first.heading_path:
+            return sections, None
+
+        # 第二个章节没有标题，说明前置区不止一段，情况复杂，保守不动。
+        if not sections[1].heading_path:
+            return sections, None
+
+        preface = first.content.strip()
+
+        if not preface or len(preface) >= cls.PREFACE_MAX_CHARS:
+            return sections, None
+
+        target = sections[1]
+
+        target.content = f"{preface}\n\n{target.content}".strip()
+        target.start_line = first.start_line
+
+        return sections[1:], preface
 
     # ========================================================
     # 短章节合并
@@ -1349,7 +1407,8 @@ class AdvancedMarkdownChunker:
             2. 识别文档类型。
             3. 提取 Markdown 表格。
             4. 按标题划分 Section。
-            5. 合并符合条件的短章节。
+            5. 把首个标题前的短前置段并入首个章节。
+            6. 合并符合条件的短章节。
             6. 按 SectionGroup 生成父块。
             7. 根据父块与原始 Section 的关系生成子块。
             8. 为父块和子块记录标题路径及原文行号。
@@ -1359,7 +1418,10 @@ class AdvancedMarkdownChunker:
 
         Args:
             content:
-                文档解析后的原始文本。
+                已经清洗过的文档文本。
+                文本清洗（HTML 还原、版式去噪、空白归一）在解析阶段
+                由 app.rag.parser 调用 DocumentCleaner 完成，
+                切分器不再做任何清洗，只负责切分。
 
             ctx:
                 任务上下文，必须包含 document_uid。
@@ -1414,10 +1476,11 @@ class AdvancedMarkdownChunker:
             )
 
             raise TypeError("content 必须是字符串")
-        # 统一文本换行符
-        source_text = self._normalize_newlines(content)
-        # 清理文档中的空 HTML 锚点，保留换行结构。
-        source_text = self._remove_empty_html_anchors(source_text)
+
+        # 文本清洗（HTML 还原、版式去噪、空白归一）在解析阶段由
+        # app.rag.parser 调用 DocumentCleaner 完成，切分器只负责切分。
+        source_text = content
+
         if not source_text.strip():
             await emit(
                 "[切分] 文档内容为空，跳过切片",
@@ -1426,7 +1489,7 @@ class AdvancedMarkdownChunker:
 
             return []
 
-        original_lines = source_text.split("\n")
+        original_lines = source_text.splitlines()
 
         # ----------------------------------------------------
         # 2. 识别文档类型
@@ -1526,6 +1589,19 @@ class AdvancedMarkdownChunker:
             protected_lines,
             is_plain_text,
         )
+
+        # 文档首个标题之前的短前置段（封面信息、文件编号、密级声明等）
+        # 并入紧随其后的第一个章节，不单独成为一个切片。
+        sections, preface = self._merge_document_preface(sections)
+
+        if preface:
+            await emit(
+                (
+                    f"[切分] 已把首个标题前的 {len(preface)} 字前置信息"
+                    f"并入首个章节，不单独成块"
+                ),
+                ctx=ctx,
+            )
 
         # 记录每个 Section 在原始 sections 中的索引。
         section_indexes = {

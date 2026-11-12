@@ -263,6 +263,13 @@ export interface KnowledgeSourceItem {
   document_title?: string | null
   knowledge_base_name?: string | null
   location?: string | null
+  /** 跳转原文：文档 uid / 知识库 uid，缺任一项则该条引用不可点击 */
+  document_uid?: string | null
+  knowledge_base_uid?: string | null
+  /** 命中段落锚点（父切片正文开头若干字符），用于在预览中定位 */
+  anchor_text?: string | null
+  source_start_line?: number | null
+  source_end_line?: number | null
 }
 
 /** 知识库引用来源卡片 */

@@ -120,9 +120,20 @@
 
     <!-- 中间：聊天主区域 -->
     <div class="chat-main-area">
+      <!-- 移动端：悬浮在聊天区左上角的会话入口，不占独立顶栏 -->
+      <button
+        class="mobile-sessions-fab"
+        type="button"
+        :aria-label="$t('chat.recentSessions')"
+        :title="$t('chat.recentSessions')"
+        @click="sessionsDrawer = true"
+      >
+        {{ $t('chat.sessionsShort') }}
+        <el-icon class="fab-arrow"><ArrowRight /></el-icon>
+      </button>
+
       <div class="chat-header">
         <div class="header-left">
-          <el-icon class="mobile-menu-btn" @click="sessionsDrawer = true"><Menu /></el-icon>
           <h2 class="chat-title">
             {{ activeSession?.name || $t('chat.newConversation') }}
             <el-icon
@@ -244,15 +255,21 @@
                     <el-icon class="ks-caret"><component :is="isKsExpanded(msg, group.title) ? CaretBottom : CaretRight" /></el-icon>
                   </button>
                   <div v-show="isKsExpanded(msg, group.title)" class="ks-rows">
-                    <div
+                    <button
                       v-for="(src, i) in group.items"
                       :key="`${group.title}-${src.index ?? i}`"
+                      type="button"
                       class="ks-row"
+                      :class="{ 'is-link': canJumpSource(src) }"
+                      :disabled="!canJumpSource(src)"
+                      :title="canJumpSource(src) ? $t('chat.sourceJumpHint') : ''"
+                      @click="jumpToSource(src)"
                     >
                       <span class="ks-branch">{{ i === group.items.length - 1 ? '└' : '├' }}</span>
                       <span class="ks-index">[{{ src.index ?? i + 1 }}]</span>
                       <span class="ks-location">{{ src.location || '-' }}</span>
-                    </div>
+                      <el-icon v-if="canJumpSource(src)" class="ks-jump"><ArrowRight /></el-icon>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1008,7 +1025,7 @@
               <span class="llm-tag">{{ progressStatusLabel }}</span>
             </div>
             <div class="run-progress-box">
-              <!-- 折叠开关：默认展开；用户收起后，后续运行的进度气泡也默认折叠 -->
+              <!-- 折叠开关：默认折叠只显示"正在执行…"；用户点开后，本次运行的进度气泡保持展开 -->
               <button
                 class="run-collapse-btn"
                 type="button"
@@ -1047,14 +1064,16 @@
         </div>
       </div>
 
-      <!-- 用户向上翻阅历史时，提供一键回到底部；留在底部时自动跟随新消息 -->
-      <transition name="fade">
-        <button v-if="!isNearBottom" class="scroll-bottom-btn" @click="scrollToBottom(true)">
-          <el-icon><Bottom /></el-icon> {{ $t('chat.scrollToBottom') }}
-        </button>
-      </transition>
+      <!-- （回到底部按钮已移入 chat-input-area，紧贴输入框上沿） -->
 
       <div class="chat-input-area">
+        <!-- 用户向上翻阅历史时，提供一键回到底部；留在底部时自动跟随新消息。
+             锚定在输入框容器上方（top 为负），移动端输入区被压缩后依然紧贴输入框 -->
+        <transition name="fade">
+          <button v-if="!isNearBottom" class="scroll-bottom-btn" @click="scrollToBottom(true)">
+            <el-icon><Bottom /></el-icon> {{ $t('chat.scrollToBottom') }}
+          </button>
+        </transition>
         <div class="input-container">
           <el-input
             v-model="inputMsg"
@@ -1283,6 +1302,11 @@
             <button class="empty-clear" type="button" @click="clearSearch">{{ $t('chat.clearSearch') }}</button>
           </div>
         </div>
+        <!-- 抽屉底部：在线状态 + 今日额度（移动端顶栏不再显示在线状态） -->
+        <div class="drawer-foot">
+          <span class="drawer-online"><span class="dot green" /> {{ $t('chat.aiOnline') }}</span>
+          <span>{{ $t('chat.quota') }} 4 / 50</span>
+        </div>
       </div>
     </el-drawer>
 
@@ -1309,7 +1333,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Plus, ChatDotRound, Edit, Service, Paperclip,
-  Document, Loading, Search, Menu, Top, Bottom, CircleCheck, CircleClose,
+  Document, Loading, Search, Top, Bottom, CircleCheck, CircleClose,
   CaretBottom, CaretRight, Delete, Close, Tickets, CopyDocument, WarningFilled, ArrowRight, Upload, Timer, Clock, MagicStick, TrendCharts
 } from '@element-plus/icons-vue'
 import {
@@ -1427,8 +1451,8 @@ const progressStatusLabel = computed(() => {
 // 中间聊天区的工作流进度块是否展示（成功后收起，但右侧仍保留本次运行结果）
 const runProgressVisible = ref(false)
 
-// 进度气泡折叠状态：用户收起后，后续运行的气泡也默认折叠，点开后才展示执行详情
-const runCollapsed = ref(false)
+// 进度气泡折叠状态：默认折叠，只显示 loading + "正在执行…"，点开后本次运行期间保持展开
+const runCollapsed = ref(true)
 const toggleRunCollapse = () => {
   runCollapsed.value = !runCollapsed.value
 }
@@ -2211,6 +2235,25 @@ const toggleKsGroup = (msg: Message, title: string) => {
   if (next.has(key)) next.delete(key)
   else next.add(key)
   expandedKsKeys.value = next
+}
+
+/** 引用条目能否跳转：必须同时有文档 uid 和知识库 uid（历史数据缺字段时保持只读） */
+const canJumpSource = (src: KnowledgeSourceItem) => !!src.document_uid && !!src.knowledge_base_uid
+
+/** 点击引用条目 → 打开文档预览，并把锚点带过去定位命中段落 */
+const jumpToSource = (src: KnowledgeSourceItem) => {
+  if (!canJumpSource(src)) return
+  void router.push({
+    name: 'CitationDocument',
+    params: {
+      kbId: src.knowledge_base_uid as string,
+      docId: src.document_uid as string,
+    },
+    query: {
+      anchor: (src.anchor_text || '').slice(0, 60),
+      loc: src.location || '',
+    },
+  })
 }
 
 /** 包装为数组供模板 v-for 取非空类型（空数组 falsy 场景处理） */
@@ -3587,12 +3630,13 @@ onBeforeUnmount(() => {
   position: relative;
 }
 
-/* 回到底部悬浮按钮 */
+/* 回到底部悬浮按钮：锚定在输入框容器上方，与输入框间距固定，不随端别写死偏移 */
 .scroll-bottom-btn {
   position: absolute;
   left: 50%;
-  bottom: 176px;
+  top: -40px;
   transform: translateX(-50%);
+  z-index: 5;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3620,7 +3664,34 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 .header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.mobile-menu-btn { display: none; font-size: 20px; color: var(--af-text-2); cursor: pointer; }
+/* 移动端会话入口：悬浮在聊天区左上角头像列内（0~58px 留白带），不压 AI 气泡 */
+.mobile-sessions-fab {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  position: absolute;
+  top: 10px;
+  left: 6px;
+  z-index: 6;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--af-border-soft);
+  background: rgba(13, 13, 13, 0.82);
+  color: var(--af-text-2);
+  font-size: 11px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: color 0.15s, border-color 0.15s;
+}
+.mobile-sessions-fab .fab-arrow { font-size: 10px; }
+.mobile-sessions-fab:active { color: var(--af-primary); border-color: var(--af-primary); }
+
+/* 会话抽屉：teleport 到 body，scoped 样式够不到，用 :global 清掉默认内边距让内容撑满 */
+:global(.af-sessions-drawer .el-drawer__body) {
+  padding: 0;
+}
 .chat-title {
   font-size: 16px; font-weight: 700; color: var(--af-text); margin: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -3902,6 +3973,32 @@ onBeforeUnmount(() => {
 .ks-branch { color: var(--af-text-3); flex-shrink: 0; }
 .ks-index { color: var(--af-text-2); flex-shrink: 0; }
 .ks-location { font-family: inherit; color: var(--af-text-2); }
+/* 引用条目从 div 改为 button 后需重置浏览器默认外观；可点击项给出 hover 反馈 */
+.ks-row {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  margin-left: -6px;
+  border-radius: 6px;
+  text-align: left;
+  cursor: default;
+}
+.ks-row.is-link { cursor: pointer; }
+.ks-row.is-link:hover {
+  background: var(--af-hover, rgba(127, 127, 127, 0.1));
+}
+.ks-row.is-link:hover .ks-location { color: var(--af-primary); }
+.ks-row:disabled { cursor: default; }
+.ks-jump {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--af-text-3);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.ks-row.is-link:hover .ks-jump { opacity: 1; color: var(--af-primary); }
 .user .text-box {
   background: var(--af-primary-gradient);
   color: #fff;
@@ -4340,6 +4437,7 @@ onBeforeUnmount(() => {
   padding: 16px 24px 12px;
   border-top: 1px solid var(--af-border-soft);
   flex-shrink: 0;
+  position: relative; /* 「回到底部」按钮的定位基准 */
 }
 .input-container {
   border: 1px solid var(--af-border);
@@ -4496,6 +4594,17 @@ onBeforeUnmount(() => {
 
 /* 移动端抽屉内的会话列表 */
 .drawer-sessions { height: 100%; display: flex; flex-direction: column; background: #0d0d0d; }
+.drawer-foot {
+  margin-top: auto;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--af-border-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--af-text-3);
+  font-size: 11px;
+}
+.drawer-online { display: inline-flex; align-items: center; gap: 7px; }
 
 /* ===== 报销记录列表卡片（extra_data.ui_type = expense_claim_list） ===== */
 .claim-card {
@@ -4893,11 +5002,13 @@ onBeforeUnmount(() => {
 }
 @media (max-width: 768px) {
   .chat-sessions-sidebar { display: none; }
-  .mobile-menu-btn { display: block; font-size: 18px; color: var(--af-text-3); }
-  .chat-header { padding: 9px 14px; }
-  .chat-title { font-size: 14.5px; font-weight: 600; }
-  .chat-tag { padding: 3px 9px; font-size: 11px; gap: 5px; }
-  .chat-messages { padding: 12px 14px; gap: 16px; }
+  /* 顶栏整条去掉，会话入口悬浮在左上角，标题信息由抽屉承载 */
+  .chat-header { display: none; }
+  .mobile-sessions-fab { display: inline-flex; }
+  /* 在线状态在窄屏上占空间，收进会话抽屉底部展示 */
+  .chat-tag { display: none; }
+  /* 顶部多留一点空间，避免首条消息被悬浮的会话按钮压住 */
+  .chat-messages { padding: 12px 14px; gap: 16px; padding-top: 44px; }
   .message-wrapper { max-width: 100%; }
   /* 移动端输入区压缩：单行起、小按钮，把纵向空间让给消息列表 */
   .chat-input-area { padding: 8px 12px 6px; }
