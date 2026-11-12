@@ -57,7 +57,6 @@
       <div class="af-card panel">
         <div class="panel-head">
           <div class="panel-title"><el-icon class="pt-icon"><DataAnalysis /></el-icon> {{ $t('admin.flowStatus') }}</div>
-          <span class="panel-more" @click="router.push('/pending-approvals')">{{ $t('employee.viewDetail') }} <el-icon><ArrowRight /></el-icon></span>
         </div>
         <div class="donut-wrap">
           <svg viewBox="0 0 36 36" class="donut">
