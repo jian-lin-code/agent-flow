@@ -56,7 +56,6 @@ export default {
   },
   login: {
     readyCluster: '私有化部署 · 运行中',
-    docs: '使用文档',
     heroBadge: '基于大模型的业务流程智能体系统',
     heroTitle1: '重塑企业效率的',
     heroTitle2: '新一代多智能体系统',

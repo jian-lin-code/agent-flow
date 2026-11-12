@@ -15,11 +15,10 @@
           <span class="brand-name">AgentFlow</span>
           <span class="brand-by">by @nexuslab</span>
         </div>
-        <span class="brand-tag">v3.4<br />ENTERPRISE</span>
+        <span class="brand-tag">v1<br />ENTERPRISE</span>
       </div>
       <div class="header-right">
         <span class="header-pill"><span class="dot green" />{{ $t('login.readyCluster') }}</span>
-        <span class="header-pill">{{ $t('login.docs') }}</span>
       </div>
     </header>
 

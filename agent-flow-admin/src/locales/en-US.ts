@@ -56,7 +56,6 @@ export default {
   },
   login: {
     readyCluster: 'Self-hosted · running',
-    docs: 'Documentation',
     heroBadge: 'LLM-powered business workflow agents',
     heroTitle1: 'Reshaping enterprise efficiency with',
     heroTitle2: 'a new generation of multi-agent systems',
