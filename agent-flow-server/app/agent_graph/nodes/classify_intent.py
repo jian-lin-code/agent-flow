@@ -288,7 +288,7 @@ async def classify_intent(state: AgentState) -> dict:
             return {"intent": Intent.PROVIDE_INFORMATION}
 
         logger.info("确定性意图识别：发起新的报销业务")
-        return {"intent": Intent.BUSINESS_ACTION}
+        return {"intent": Intent.BUSINESS_ACTION,"business_action_ready":True}
 
     # ================= 降级：走 LLM 识别 =================
 
