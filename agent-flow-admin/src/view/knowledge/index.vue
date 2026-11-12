@@ -159,17 +159,6 @@
           <div v-if="filteredList.length === 0" class="mobile-empty">{{ $t('kb.mobileEmpty') }}</div>
         </div>
 
-        <!-- 引擎横幅 -->
-        <div class="af-card engine-banner">
-          <div class="engine-left">
-            <span class="engine-icon"><el-icon><Coin /></el-icon></span>
-            <div class="engine-text">
-              <b>{{ $t('kb.engineTitle') }}</b>
-              <i>{{ $t('kb.engineDesc') }}</i>
-            </div>
-          </div>
-          <span class="engine-setting">{{ $t('kb.engineConfig') }}</span>
-        </div>
       </div>
 
       <!-- 右侧栏 -->
@@ -267,7 +256,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import {
   Search, Plus, Collection, Document, Loading, MoreFilled,
-  ArrowRight, Reading, User, Refresh, Filter, Coin,
+  ArrowRight, Reading, User, Refresh, Filter,
   CircleCheck, CircleClose, ChatDotRound
 } from '@element-plus/icons-vue'
 import {
@@ -552,21 +541,6 @@ onMounted(loadKnowledgeBases)
 .kb-card-time { margin-left: auto; }
 .kb-card-ops { display: flex; gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--af-border-soft); }
 .mobile-empty { text-align: center; color: var(--af-text-3); font-size: 12px; padding: 40px 0; }
-
-/* 引擎横幅 */
-.engine-banner { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px 20px; flex-wrap: wrap; }
-.engine-left { display: flex; align-items: center; gap: 13px; min-width: 0; }
-.engine-icon {
-  width: 40px; height: 40px; flex-shrink: 0;
-  border-radius: 11px;
-  background: var(--af-info-soft);
-  color: var(--af-info);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 19px;
-}
-.engine-text b { display: block; color: var(--af-text); font-size: 13px; }
-.engine-text i { display: block; color: var(--af-text-3); font-size: 11px; font-style: normal; margin-top: 3px; }
-.engine-setting { color: var(--af-text-2); font-size: 12px; border: 1px solid var(--af-border); border-radius: 8px; padding: 7px 14px; cursor: pointer; flex-shrink: 0; }
 
 /* ===== 右侧栏 ===== */
 .panel { padding: 18px 20px; }

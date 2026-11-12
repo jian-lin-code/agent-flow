@@ -1066,10 +1066,6 @@
             @keydown.enter.exact.prevent="handleSend"
           />
           <div class="input-toolbar">
-            <div class="left-tools">
-              <button class="tool-btn"><el-icon><Paperclip /></el-icon> {{ $t('chat.uploadFile') }}</button>
-              <button class="tool-btn"><el-icon><Picture /></el-icon> {{ $t('chat.addImage') }}</button>
-            </div>
             <button class="send-btn" @click="handleSend" :disabled="!inputMsg.trim() || loading || hasActiveRun">
               {{ $t('employee.send') }} <el-icon><Top /></el-icon>
             </button>
@@ -1311,7 +1307,7 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  Plus, ChatDotRound, Edit, Service, Paperclip, Picture,
+  Plus, ChatDotRound, Edit, Service, Paperclip,
   Document, Loading, Search, Menu, Top, Bottom, CircleCheck, CircleClose,
   CaretBottom, CaretRight, Delete, Close, Tickets, CopyDocument, WarningFilled, ArrowRight, Upload, Timer, Clock, MagicStick, TrendCharts
 } from '@element-plus/icons-vue'
@@ -4352,24 +4348,11 @@ onBeforeUnmount(() => {
 }
 .input-toolbar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   margin-top: 10px;
   gap: 10px;
 }
-.left-tools { display: flex; gap: 6px; flex-wrap: wrap; }
-.tool-btn {
-  display: inline-flex; align-items: center; gap: 5px;
-  background: transparent;
-  border: 1px solid var(--af-border-soft);
-  color: var(--af-text-3);
-  border-radius: 8px;
-  padding: 6px 11px;
-  font-size: 12px;
-  cursor: pointer;
-  min-height: 32px;
-}
-.tool-btn:hover { color: var(--af-text); border-color: var(--af-border); }
 .send-btn {
   display: inline-flex; align-items: center; gap: 6px;
   background: var(--af-primary-gradient);
