@@ -1,14 +1,5 @@
 <template>
   <div class="ai-chat-container">
-    <!-- 发票上传的隐藏文件选择器（入口在任务卡片明细行内） -->
-    <input
-      ref="invoiceInput"
-      type="file"
-      class="invoice-input"
-      accept=".pdf,.jpg,.jpeg,.png"
-      multiple
-      @change="onInvoiceFileChange"
-    />
     <!-- 左侧：最近会话列表 -->
     <aside class="chat-sessions-sidebar">
       <div class="sidebar-header">
@@ -386,19 +377,32 @@
                             <el-icon><CircleCheck /></el-icon>
                             {{ $t('chat.invoiceUploadedCount', { count: item.invoiceCount }) }}
                           </span>
-                          <button
-                            v-if="item.invoiceMissing"
-                            type="button"
-                            class="td-invoice-btn"
-                            :class="{ ghost: item.invoiceCount > 0 }"
-                            :disabled="uploadingItemUid === item.id || !canUploadInvoice(taskView(msg).status)"
-                            :title="canUploadInvoice(taskView(msg).status) ? $t('chat.invoiceUploadHint') : $t('chat.invoiceUploadLocked')"
-                            @click="openInvoiceUpload(msg, item)"
-                          >
-                            <el-icon v-if="uploadingItemUid === item.id" class="is-loading"><Loading /></el-icon>
-                            <el-icon v-else><Upload /></el-icon>
-                            {{ uploadingItemUid === item.id ? $t('chat.invoiceUploading') : $t('chat.invoiceUpload') }}
-                          </button>
+                          <!-- 上传入口：按钮上覆盖一个透明的 file input。
+                               用原生点击直接触发选择器，不依赖 JS 里 input.click()，
+                               规避移动端 WebView 对 display:none 输入框不触发 change 的问题 -->
+                          <span v-if="item.invoiceMissing" class="td-invoice-uploader">
+                            <button
+                              type="button"
+                              class="td-invoice-btn"
+                              :class="{ ghost: item.invoiceCount > 0 }"
+                              :disabled="uploadingItemUid === item.id || !canUploadInvoice(taskView(msg).status)"
+                              :title="canUploadInvoice(taskView(msg).status) ? $t('chat.invoiceUploadHint') : $t('chat.invoiceUploadLocked')"
+                            >
+                              <el-icon v-if="uploadingItemUid === item.id" class="is-loading"><Loading /></el-icon>
+                              <el-icon v-else><Upload /></el-icon>
+                              {{ uploadingItemUid === item.id ? $t('chat.invoiceUploading') : $t('chat.invoiceUpload') }}
+                            </button>
+                            <input
+                              v-if="canUploadInvoice(taskView(msg).status) && uploadingItemUid !== item.id"
+                              class="td-invoice-input"
+                              type="file"
+                              :accept="INVOICE_ACCEPT"
+                              :multiple="!isMobileViewport"
+                              :title="$t('chat.invoiceUploadHint')"
+                              :aria-label="$t('chat.invoiceUpload')"
+                              @change="onInvoiceFileChange($event, msg, item)"
+                            />
+                          </span>
                           <span v-if="item.missingLabels.length" class="td-item-warn">
                             {{ $t('chat.taskMissingInline', { fields: item.missingLabels.join('、') }) }}
                           </span>
@@ -1371,6 +1375,7 @@ import { useUserStore } from '@/stores/user'
 import PreReviewDrawer from './expense/PreReviewDrawer.vue'
 import DeleteSessionDialog from '@/components/DeleteSessionDialog.vue'
 import { renderMarkdown } from '@/utils/markdown'
+import { normalizeInvoiceFile, isSupportedInvoiceFile } from '@/utils/image'
 
 const userStore = useUserStore()
 const { t, locale } = useI18n()
@@ -3082,18 +3087,12 @@ const INVOICE_UPLOADABLE_STATUSES = ['collecting', 'waiting_confirmation']
 const canUploadInvoice = (status?: string) =>
   !!status && INVOICE_UPLOADABLE_STATUSES.includes(status)
 
-const invoiceInput = ref<HTMLInputElement | null>(null)
-const invoiceTarget = ref<{ msg: Message; itemId: string; taskUid: string } | null>(null)
+// 手机相册里的照片可能被标成 image/heic、image/*，所以放开到图片全类型，
+// 由 normalizeInvoiceFile 统一转成 JPEG 后再交给后端（后端仍只收 pdf/jpg/png）
+const INVOICE_ACCEPT = 'image/*,.pdf,application/pdf'
+
 // 正在上传发票的明细 id：按钮转 loading，其他明细的上传按钮不受影响
 const uploadingItemUid = ref<string | null>(null)
-
-/** 打开文件选择器：先记录目标明细，选完文件后在 change 里统一上传 */
-const openInvoiceUpload = (msg: Message, item: TaskItemView) => {
-  const taskUid = taskView(msg).uid
-  if (!currentSessionId.value || !taskUid || uploadingItemUid.value) return
-  invoiceTarget.value = { msg, itemId: item.id, taskUid }
-  invoiceInput.value?.click()
-}
 
 /**
  * 上传发票成功后刷新会话消息。
@@ -3105,25 +3104,39 @@ const refreshAfterInvoiceUpload = async (conversationUid: string) => {
   await fetchMessages(conversationUid)
 }
 
-const onInvoiceFileChange = async (event: Event) => {
+/**
+ * 选中文件后上传。
+ *
+ * msg / item 由模板直接传入（不再依赖「先点按钮记录目标」的中转状态），
+ * 这样即使选择器打开期间消息列表被刷新、组件重渲染，也不会丢失上传目标。
+ */
+const onInvoiceFileChange = async (event: Event, msg: Message, item: TaskItemView) => {
   const input = event.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
+  const picked = Array.from(input.files ?? [])
   // 先重置 value，保证同一文件可以重复选择
   input.value = ''
-  const target = invoiceTarget.value
-  invoiceTarget.value = null
+
+  // 用户在有选择器的情况下取消选择：静默返回（不做任何提示）
+  if (!picked.length) return
+
   const conversationUid = currentSessionId.value
-  if (!target || !files.length || !conversationUid) return
+  const taskUid = taskView(msg).uid
+  if (!conversationUid || !taskUid || uploadingItemUid.value) return
 
-  const { itemId, taskUid } = target
-  uploadingItemUid.value = itemId
-
+  uploadingItemUid.value = item.id
   let uploadedCount = 0
+  let rejectedCount = 0
 
   try {
     // 多选时逐个上传；失败即中断，已成功的部分仍然生效
-    for (const file of files) {
-      await uploadExpenseItemAttachmentApi(conversationUid, taskUid, itemId, file)
+    for (const raw of picked) {
+      // 手机原图先归一化：HEIC/WebP/超大图 → JPEG，避免后端 415 或超过 10MB
+      const file = await normalizeInvoiceFile(raw)
+      if (!isSupportedInvoiceFile(file)) {
+        rejectedCount += 1
+        continue
+      }
+      await uploadExpenseItemAttachmentApi(conversationUid, taskUid, item.id, file)
       uploadedCount += 1
     }
   } catch (error: any) {
@@ -3136,6 +3149,9 @@ const onInvoiceFileChange = async (event: Event) => {
       ElMessage.success(t('chat.invoiceUploadSuccess', { count: uploadedCount }))
       // 后端会为本次上传追加一条 assistant 消息，重新拉取列表把新消息和新卡片带出来
       await refreshAfterInvoiceUpload(conversationUid)
+    } else if (rejectedCount) {
+      // 前端能识别但格式不支持（如无法解码的 HEIC）：明确告知，避免「点了没反应」
+      ElMessage.error(t('chat.invoiceUploadFailed'))
     }
     uploadingItemUid.value = null
   }
@@ -4357,7 +4373,22 @@ onBeforeUnmount(() => {
   border-color: var(--af-text-3);
   background: var(--af-hover);
 }
-.invoice-input { display: none; }
+/* 上传入口容器：透明 file input 铺满按钮，点击直接走原生选择器 */
+.td-invoice-uploader {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+}
+.td-invoice-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  /* 16px：避免 iOS 聚焦时页面被放大 */
+  font-size: 16px;
+}
 
 /* 待补充汇总 / 信息完整 */
 .td-alert {
@@ -5010,10 +5041,11 @@ onBeforeUnmount(() => {
   /* 顶部多留一点空间，避免首条消息被悬浮的会话按钮压住 */
   .chat-messages { padding: 12px 14px; gap: 16px; padding-top: 44px; }
   .message-wrapper { max-width: 100%; }
-  /* 移动端输入区压缩：单行起、小按钮，把纵向空间让给消息列表 */
+  /* 移动端输入区压缩：单行起、小按钮，把纵向空间让给消息列表
+     注意：字号必须 >= 16px，否则 iOS Safari 聚焦时会自动放大整个页面 */
   .chat-input-area { padding: 8px 12px 6px; }
   .input-container { padding: 8px 10px; border-radius: 12px; }
-  .custom-textarea :deep(.el-textarea__inner) { font-size: 14px; line-height: 1.5; }
+  .custom-textarea :deep(.el-textarea__inner) { font-size: 16px; line-height: 1.5; }
   .input-toolbar { margin-top: 5px; }
   .send-btn { min-height: 32px; padding: 5px 13px; font-size: 12px; border-radius: 8px; }
   .input-disclaimer { display: none; }

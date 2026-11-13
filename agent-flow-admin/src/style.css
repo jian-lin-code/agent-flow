@@ -160,3 +160,21 @@ html.dark .el-button--primary {
 html.dark .el-drawer {
   background: #141414;
 }
+
+/* ============================================================
+   移动端表单控件字号兜底
+   ------------------------------------------------------------
+   iOS Safari 聚焦字号小于 16px 的 input/textarea 时会自动放大整个页面，
+   键盘收起后也不会复原。这里统一把移动端表单控件提到 16px 规避，
+   桌面端不受影响（项目里大量控件是 12~14px 的紧凑排版）。
+   ============================================================ */
+@media (max-width: 768px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+  textarea,
+  textarea.el-textarea__inner,
+  .el-input__inner,
+  .el-select__input,
+  .el-textarea__inner {
+    font-size: 16px;
+  }
+}
