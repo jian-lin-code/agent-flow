@@ -155,8 +155,8 @@ const loading = ref(false)
 const rememberMe = ref(true)
 
 const loginForm = reactive({
-  username: 'admin',
-  password: '123456'
+  username: '',
+  password: ''
 })
 
 const loginRules = computed<FormRules>(() => ({
