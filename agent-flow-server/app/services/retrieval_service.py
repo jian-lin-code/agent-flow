@@ -119,7 +119,10 @@ class KnowledgeRetrievalService:
             user_role=user_role,
             max_contexts=max_contexts,
         )
-        logger.info(f'父切片数据 加上子切片为表格的数据：{contexts}')
+        logger.info(
+            "知识库检索完成：candidates=%d reranked=%d filtered=%d contexts=%d",
+            len(candidates), len(reranked_candidates), filtered_count, len(contexts),
+        )
         # 返回完整检索结果
         return {
             "query": query,

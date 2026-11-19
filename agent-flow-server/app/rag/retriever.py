@@ -39,9 +39,6 @@ class KnowledgeRetriever:
         Returns:
             相似子切片列表，包含 chunk、文档信息及相似度。
         """
-
-        top_k = max(1, min(top_k, 100))
-
         # 将用户问题转换为向量
         query_embedding = await self.embedding_service.embed_query(
             query,
@@ -55,6 +52,7 @@ class KnowledgeRetriever:
         # 在用户有权限访问的知识库中执行向量召回
         candidates = await self.repository.search_similar_child_chunks(
             query_embedding=query_embedding,
+            query=query,
             user_id=user_id,
             user_role=user_role,
             top_k=top_k,

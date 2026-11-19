@@ -196,14 +196,17 @@ async def handle_knowledge_query(state: AgentState) -> dict[str, Any]:
         )
 
         # 执行完整知识库检索
+        # top_k 是「融合后交给 reranker 的候选数」，取 20 而不是 10：
+        # 两路各召回 60 条后 RRF 融合，只留 10 条给 reranker 挑选的余地太小；
+        # min_rerank_score 从 0.7 下调到 0.5，0.7 会把「相关但表述不同」的段落直接判死。
         result = await retrieval_service.retrieve(
             query=query,
             user_id=user_id,
             user_role=user_role,
-            top_k=10,
+            top_k=20,
             top_n=5,
             max_contexts=3,
-            min_rerank_score=0.7
+            min_rerank_score=0.5
         )
 
         # 将 ORM 对象转换为普通字典

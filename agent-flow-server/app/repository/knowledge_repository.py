@@ -1,10 +1,12 @@
 
 from typing import Any
 
-from sqlalchemy import delete, func, or_, select, true, update
+from sqlalchemy import delete, func, or_, select, true, update, text, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from pgvector.sqlalchemy import Vector
 
+from app.core.config import settings
 from app.models.knowledge import (
     Document,
     DocumentChunk,
@@ -12,6 +14,7 @@ from app.models.knowledge import (
     KnowledgeBasePermission, DocumentStatus,
 )
 from app.models.user import User
+from app.utils.logger import logger
 
 
 class KnowledgeRepository:
@@ -94,115 +97,194 @@ class KnowledgeRepository:
         return {kb_id: permission for kb_id, permission in rows}
 
 
-    # 在用户有权访问的全部知识库中执行子切片向量检索
+    # 在用户有权访问的全部知识库中执行混合检索
     async def search_similar_child_chunks(
             self,
             query_embedding: list[float],
+            query: str,
             user_id: int,
             user_role: str,
             top_k: int = 30,
     ) -> list[dict]:
         """
-        在用户有权访问的知识库中检索相似子切片。
-
-        权限规则：
-        1. admin 可以检索全部知识库。
-        2. employee 可以检索共享知识库。
-        3. employee 可以检索自己创建的私有知识库。
-        4. employee 可以检索被授权的知识库。
-        5. 未知角色不允许检索。
-
-        只检索已完成索引且存在向量的子切片。
+        混合检索：向量 + 全文（基于 RRF 融合）
         """
-
-        # 限制候选数量，避免一次返回过多数据
         top_k = max(1, min(top_k, 100))
 
-        # 计算向量余弦距离
-        distance = DocumentChunk.embedding.cosine_distance(
-            query_embedding
-        ).label("distance")
+        # RRF 融合时，每路取更多的候选集（比如 60）
+        candidate_limit = max(60, top_k * 3)
 
-        # 构建基础检索语句
-        stmt = (
-            select(
-                DocumentChunk,
-                Document.title.label("document_title"),
-                KnowledgeBase.id.label("knowledge_base_id"),
-                KnowledgeBase.uid.label("knowledge_base_uid"),
-                KnowledgeBase.name.label("knowledge_base_name"),
-                distance,
-            )
-            .join(
-                Document,
-                Document.id == DocumentChunk.document_id,
-            )
-            .join(
-                KnowledgeBase,
-                KnowledgeBase.id == Document.knowledge_base_id,
-            )
-            .where(
-                # 只检索子切片，不直接检索父切片
-                DocumentChunk.is_parent.is_(False),
+        # 基础条件（向量路与全文路共用）
+        # status 兼容历史数据：早期入库写的是枚举 name（'INDEXED'），现在写 value（'indexed'），
+        # 统一按 lower() 比较，避免存量文档被整表过滤掉。
+        base_where = """
+            dc.is_parent = false
+            AND lower(d.status) = 'indexed'
+        """
 
-                # 排除没有向量的切片
-                DocumentChunk.embedding.is_not(None),
+        # 向量路必须要有向量；全文路只要有 fts，不要求 embedding
+        vector_where = f"{base_where} AND dc.embedding IS NOT NULL"
+        text_where = f"{base_where} AND dc.fts IS NOT NULL"
 
-                # 只检索已经完成索引的文档
-                Document.status == DocumentStatus.INDEXED,
-            )
-        )
+        # 如果是 employee，把权限判断加进 SQL
+        permission_where = ""
+        query_params = {
+            "embedding": query_embedding,
+            "query": query,
+            "limit": candidate_limit,
+            "top_k": top_k,
+        }
 
-        # employee 必须在 SQL 查询阶段完成知识库权限过滤
         if user_role == "employee":
-            # 判断当前用户是否拥有该知识库的授权记录
-            permission_exists = (
-                select(KnowledgeBasePermission.knowledge_base_id)
-                .where(
-                    KnowledgeBasePermission.knowledge_base_id
-                    == KnowledgeBase.id,
-                    KnowledgeBasePermission.user_id == user_id,
-                )
-                .exists()
-            )
-
-            # 共享知识库、本人创建的知识库、已授权知识库均可检索
-            stmt = stmt.where(
-                or_(
-                    KnowledgeBase.visibility == "shared",
-                    KnowledgeBase.created_by_user_id == user_id,
-                    permission_exists,
+            permission_where = """
+            AND (
+                kb.visibility = 'shared'
+                OR kb.created_by_user_id = :user_id
+                OR EXISTS (
+                    SELECT 1 FROM knowledge_base_permissions p
+                    WHERE p.knowledge_base_id = kb.id
+                    AND p.user_id = :user_id
                 )
             )
+            """
+            query_params["user_id"] = user_id
 
-        # 按余弦距离升序排列，距离越小越相似
-        stmt = (
-            stmt
-            .order_by(distance.asc())
-            .limit(top_k)
-        )
+        # 构造双路召回 + RRF 融合的纯 SQL
+        #
+        # 全文路的 tsquery 用「OR 语义」而非常见的 AND / 短语语义：
+        # plainto_tsquery 产出 'a' & 'b' & 'c'，要求同一块同时包含全部词，
+        # 一个自然语言问句切出七八个词后几乎不可能命中；改成 'a' | 'b' | 'c' 后
+        # 任一关键词命中即可召回，再由 ts_rank_cd 按命中密度排序。
+        # 纯标点等无法分词的情况会得到空 tsquery，NULLIF 置空后全文路整体跳过。
+        # MATERIALIZED 是为了让两路候选集只算一次（计数与反查都要用）。
+        sql = text(f"""
+            WITH q AS MATERIALIZED (
+                SELECT CAST(
+                    NULLIF(
+                        replace(
+                            CAST(plainto_tsquery('public.chinese', :query) AS text),
+                            ' & ', ' | '
+                        ),
+                        ''
+                    ) AS tsquery
+                ) AS tsq
+            ),
+            vector_search AS MATERIALIZED (
+                SELECT dc.id, ROW_NUMBER() OVER (ORDER BY dc.embedding <=> :embedding) AS rank
+                FROM document_chunks dc
+                JOIN documents d ON d.id = dc.document_id
+                JOIN knowledge_bases kb ON kb.id = d.knowledge_base_id
+                WHERE {vector_where} {permission_where}
+                ORDER BY dc.embedding <=> :embedding
+                LIMIT :limit
+            ),
+            text_search AS MATERIALIZED (
+                SELECT dc.id, ROW_NUMBER() OVER (
+                    ORDER BY ts_rank_cd(dc.fts, q.tsq) DESC
+                ) AS rank
+                FROM document_chunks dc
+                JOIN documents d ON d.id = dc.document_id
+                JOIN knowledge_bases kb ON kb.id = d.knowledge_base_id
+                CROSS JOIN q
+                WHERE {text_where}
+                  AND q.tsq IS NOT NULL
+                  AND dc.fts @@ q.tsq
+                  {permission_where}
+                ORDER BY ts_rank_cd(dc.fts, q.tsq) DESC
+                LIMIT :limit
+            ),
+            fused AS (
+                SELECT
+                    COALESCE(v.id, t.id) AS chunk_id,
+                    -- RRF 公式：1 / (k + rank)，k 取 60
+                    COALESCE(1.0 / (60 + v.rank), 0.0)
+                        + COALESCE(1.0 / (60 + t.rank), 0.0) AS rrf_score
+                FROM vector_search v
+                FULL OUTER JOIN text_search t ON v.id = t.id
+                ORDER BY rrf_score DESC
+                LIMIT :top_k
+            )
+            SELECT
+                f.chunk_id,
+                f.rrf_score,
+                -- 真实的向量余弦相似度，供上层做阈值判断；
+                -- 不能用 rrf_score 冒充 similarity（量级只有 0~0.033）。
+                COALESCE(1 - (dc.embedding <=> :embedding), 0) AS vector_similarity,
+                (SELECT count(*) FROM vector_search) AS vector_hits,
+                (SELECT count(*) FROM text_search) AS text_hits,
+                d.title AS document_title,
+                kb.id AS knowledge_base_id,
+                kb.uid AS knowledge_base_uid,
+                kb.name AS knowledge_base_name
+            FROM fused f
+            JOIN document_chunks dc ON dc.id = f.chunk_id
+            JOIN documents d ON d.id = dc.document_id
+            JOIN knowledge_bases kb ON kb.id = d.knowledge_base_id
+            ORDER BY f.rrf_score DESC;
+        """).bindparams(bindparam("embedding", type_=Vector(settings.EMBEDDING_DIMENSION)))
 
-        # 执行数据库查询
-        result = await self.session.execute(stmt)
+        # 执行原生 SQL
+        result = await self.session.execute(sql, query_params)
         rows = result.all()
 
-        # 本次检索命中的知识库，调用频次 +1（去重后批量自增）
+        if rows:
+            logger.info(
+                "混合检索完成：query=%r vector_hits=%d text_hits=%d fused=%d",
+                query, rows[0].vector_hits, rows[0].text_hits, len(rows),
+            )
+        else:
+            # 两路都没结果时，把分词结果打出来，避免下次还要连库排查。
+            # 这里打印的是实际参与检索的 OR 版 tsquery（与主查询保持一致）。
+            tsq = (
+                await self.session.execute(
+                    text(
+                        "SELECT CAST(NULLIF(replace("
+                        "CAST(plainto_tsquery('public.chinese', :q) AS text),"
+                        " ' & ', ' | '), '') AS text) AS tsq"
+                    ),
+                    {"q": query},
+                )
+            ).scalar_one_or_none()
+            logger.warning(
+                "混合检索无结果：query=%r tsquery=%r vector_hits=0 text_hits=0 "
+                "（tsquery 为空说明问题被分词器过滤干净；否则检查文档是否已索引）",
+                query, tsq,
+            )
+
+        # 提取 chunk_id 列表和命中的知识库
+        chunk_ids = [row.chunk_id for row in rows]
         hit_kb_ids = sorted({row.knowledge_base_id for row in rows})
+
         if hit_kb_ids:
             await self.increment_retrieval_counts(hit_kb_ids)
 
-        # 整理检索结果
-        return [
-            {
-                "chunk": row[0],
+        # 去库中捞取完整的 ORM 对象（保持返回值结构一致）
+        chunk_map = {}
+        if chunk_ids:
+            chunk_stmt = select(DocumentChunk).where(DocumentChunk.id.in_(chunk_ids))
+            chunk_result = await self.session.execute(chunk_stmt)
+            chunk_map = {c.id: c for c in chunk_result.scalars().all()}
+
+        # 组装返回结果
+        final_results = []
+        for row in rows:
+            # chunk 理论上一定存在（fused 由 chunk id 反查而来），
+            # 但并发删除时可能已被清理，交给上层按 None 过滤
+            chunk = chunk_map.get(row.chunk_id)
+            if chunk is None:
+                continue
+
+            final_results.append({
+                "chunk": chunk,
                 "document_title": row.document_title,
                 "knowledge_base_uid": row.knowledge_base_uid,
                 "knowledge_base_name": row.knowledge_base_name,
-                "distance": float(row.distance),
-                "similarity": 1.0 - float(row.distance),
-            }
-            for row in rows
-        ]
+                "rrf_score": float(row.rrf_score),
+                # 相似度保留向量余弦值（0~1），不要用 RRF 分数冒充
+                "similarity": float(row.vector_similarity),
+            })
+
+        return final_results
 
     async def increment_retrieval_counts(self, kb_ids: list[int]) -> None:
         """批量自增知识库检索调用频次并提交事务。"""
