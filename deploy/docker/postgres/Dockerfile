@@ -1,8 +1,9 @@
 FROM pgvector/pgvector:pg16
 
-# 换阿里云源，加速 apt-get
-RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list \
- && sed -i 's|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list \
+# 换阿里云源（直接覆盖写入 Debian 12 的源，避免找不到文件报错），并安装依赖
+RUN echo "deb http://mirrors.aliyun.com/debian/ bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list \
+ && echo "deb http://mirrors.aliyun.com/debian/ bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list \
+ && echo "deb http://mirrors.aliyun.com/debian-security/ bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list \
  && apt-get update && apt-get install -y --no-install-recommends \
     gcc make ca-certificates postgresql-server-dev-16 bzip2 \
  && rm -rf /var/lib/apt/lists/*
