@@ -32,7 +32,7 @@ services:
       TZ: Asia/Shanghai
     # 连接池预算：api/chat/rag/review 各 20 条（pool 10 + overflow 10），再留出余量
     # 按机器内存调整：4C4G → 150 / 256MB（当前基线）；8G → 200 / 512MB；16G → 200 / 1GB；2G → 100 / 128MB
-    command: ["postgres", "-c", "max_connections=150", "-c", "shared_buffers=256MB"]
+    command: ["postgres", "-c", "max_connections=150", "-c", "shared_buffers=256MB", "-c", "shared_preload_libraries=zhparser"]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./deploy/docker/initdb:/docker-entrypoint-initdb.d:ro
