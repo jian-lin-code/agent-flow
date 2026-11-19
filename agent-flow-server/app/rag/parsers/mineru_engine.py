@@ -102,8 +102,7 @@ class MinerUService:
 
         finally:
             # 无论成功失败，统一在 finally 中清理本地临时目录，防止磁盘占满
-            pass
-            # await self._clean_task_output_dir(task_output_dir, ctx)
+            await self._clean_task_output_dir(task_output_dir, ctx)
 
     async def _get_upload_url(self, filename: str, ctx: Dict) -> tuple[str, str]:
         """1. 请求 MinerU API，获取用于上传文件的预签名 URL 和任务 batch_id"""

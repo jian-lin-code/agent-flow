@@ -21,7 +21,9 @@ x-backend: &backend
 services:
 
   postgres:
-    image: pgvector/pgvector:pg16
+    build:
+      context: ./deploy/docker/postgres
+    image: agentflow/pgvector-zh:pg16     # 原 image: pgvector/pgvector:pg16 删掉
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-agentflow}
